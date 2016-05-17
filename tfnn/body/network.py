@@ -3,14 +3,15 @@ import tensorflow as tf
 
 
 class Network(object):
-    def __init__(self, n_inputs, n_outputs, dtype=tf.float32, seed=None):
+    def __init__(self, n_inputs, n_outputs, input_dtype, output_dtype, seed=None):
         self.n_inputs = n_inputs
         self.n_outputs = n_outputs
-        self.dtype = dtype
+        self.input_dtype = input_dtype
+        self.output_dtype = output_dtype
         self.seed = None
 
-        self.data_placeholder = tf.placeholder(dtype=dtype, shape=[None, n_inputs], name='Input_data')
-        self.target_placeholder = tf.placeholder(dtype=dtype, shape=[None, n_outputs], name='Target_data')
+        self.data_placeholder = tf.placeholder(dtype=input_dtype, shape=[None, n_inputs], name='Input_data')
+        self.target_placeholder = tf.placeholder(dtype=output_dtype, shape=[None, n_outputs], name='Target_data')
         self.layers_output = pd.Series([])
         self.Ws = pd.Series([])
         self.bs = pd.Series([])
@@ -27,10 +28,10 @@ class Network(object):
         :return:
         """
         W = tf.Variable(tf.random_normal([self.last_layer_neurons, n_neurons],
-                                         mean=0.0, stddev=0.3, dtype=self.dtype,
+                                         mean=0.0, stddev=0.3, dtype=self.input_dtype,
                                          seed=self.seed, name='weights'))
         b = tf.Variable(tf.random_uniform([n_neurons, ], minval=0, maxval=0.1,
-                                          dtype=self.dtype, seed=self.seed, name='biases'))
+                                          dtype=self.input_dtype, seed=self.seed, name='biases'))
         product = tf.matmul(self.last_layer_inputs, W, name='feed_product') + b
 
         if activator is None:
