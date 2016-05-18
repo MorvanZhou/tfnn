@@ -20,12 +20,11 @@ data.shuffle(inplace=True)
 data.to_binary(inplace=True)
 t_data, v_data = data.train_test_split()
 
-network = tfnn.ClassificationNetwork(4096, 40, method='softmax')
-# network.add_hidden_layer(100, activator=tf.nn.relu)
-optimizer = tf.train.GradientDescentOptimizer(0.01)
-network.set_optimizer(optimizer)
-
-for i in range(2000):
+network = tfnn.ClassificationNetwork(4096, 40, method='softmax', l2=.5)
+network.add_hidden_layer(100, activator=tf.nn.relu)
+network.set_optimizer(tf.train.GradientDescentOptimizer, learning_rate=0.1)
+writer = tf.train.SummaryWriter("/tmp/test", network.sess.graph)
+for i in range(1000):
     b_xs, b_ys = t_data.next_batch(50, loop=True)
     # b_xs, b_ys = mnist.train.next_batch(100)
     network.run_step(b_xs, b_ys)

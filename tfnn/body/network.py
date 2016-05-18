@@ -10,15 +10,19 @@ class Network(object):
         self.output_dtype = output_dtype
         self.seed = None
 
-        self.data_placeholder = tf.placeholder(dtype=input_dtype, shape=[None, n_inputs], name='Input_data')
-        self.target_placeholder = tf.placeholder(dtype=output_dtype, shape=[None, n_outputs], name='Target_data')
+        with tf.name_scope('Inputs'):
+            self.data_placeholder = tf.placeholder(dtype=input_dtype, shape=[None, n_inputs], name='x_input')
+            self.target_placeholder = tf.placeholder(dtype=output_dtype, shape=[None, n_outputs], name='y_input')
         self.layers_output = pd.Series([])
+        self.layers_activated_output = pd.Series([])
         self.Ws = pd.Series([])
         self.bs = pd.Series([])
         self.last_layer_neurons = n_inputs
-        self.last_layer_inputs = self.data_placeholder
+        self.last_layer_outputs = self.data_placeholder
+        self.output_activator = None
+        self.hidden_number = 1
 
-    def add_hidden_layer(self, n_neurons, activator=None):
+    def add_hidden_layer(self, n_neurons, activator=None, ):
         """
         W shape(n_last_layer_neurons, n_this_layer_neurons]
         b shape(n_this_layer_neurons, ]
@@ -27,28 +31,36 @@ class Network(object):
         :param activator:
         :return:
         """
-        W = tf.Variable(tf.random_normal([self.last_layer_neurons, n_neurons],
-                                         mean=0.0, stddev=0.3, dtype=self.input_dtype,
-                                         seed=self.seed, name='weights'))
-        b = tf.Variable(tf.random_uniform([n_neurons, ], minval=0, maxval=0.1,
-                                          dtype=self.input_dtype, seed=self.seed, name='biases'))
-        product = tf.matmul(self.last_layer_inputs, W, name='feed_product') + b
+        layer_name = 'layer%i' % self.hidden_number
+        with tf.name_scope(layer_name):
+            W = tf.Variable(tf.random_normal([self.last_layer_neurons, n_neurons],
+                                             mean=0.0, stddev=0.3, dtype=self.input_dtype,
+                                             seed=self.seed, name='weights'))
+            b = tf.Variable(tf.random_uniform([n_neurons, ], minval=0, maxval=0.1,
+                                              dtype=self.input_dtype, seed=self.seed, name='biases'))
+            product = tf.add(tf.matmul(self.last_layer_outputs, W, name='Wx'), b, name='Wx+b')
 
-        if activator is None:
-            activated_product = product
-        else:
-            activated_product = activator(product)
-        self.last_layer_inputs = activated_product
+            if activator is None:
+                activated_product = product
+            else:
+                activated_product = activator(product, name='layer_activated_product')
+
+        self.hidden_number += 1
+        self.last_layer_outputs = activated_product
         self.Ws.set_value(label=len(self.Ws), value=W)
         self.bs.set_value(label=len(self.bs), value=b)
         self.layers_output.set_value(label=len(self.layers_output),
-                                     value=activated_product)
+                                     value=product)
+        self.layers_activated_output.set_value(label=len(self.layers_output),
+                                               value=activated_product)
         self.last_layer_neurons = n_neurons
 
-    def set_optimizer(self, optimizer, global_step=None):
+    def set_optimizer(self, optimizer, learning_rate, global_step=None):
         self._add_output_layer()
         self._init_loss()
-        self.train_op = optimizer.minimize(self.loss, global_step)
+        with tf.name_scope('trian'):
+            opt = optimizer(learning_rate)
+            self.train_op = opt.minimize(self.loss, global_step)
         _init = tf.initialize_all_variables()
         self.sess = tf.Session()
         self.sess.run(_init)
@@ -78,7 +90,7 @@ class Network(object):
         return Ws
 
     def _add_output_layer(self):
-        self.add_hidden_layer(self.n_outputs, activator=None)
+        self.add_hidden_layer(self.n_outputs, activator=self.output_activator)
 
     def _init_loss(self):
         self.loss = None
