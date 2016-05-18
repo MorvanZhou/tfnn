@@ -34,30 +34,30 @@ class Network(object):
         layer_name = 'layer%i' % self.hidden_number
         with tf.name_scope(layer_name):
             with tf.name_scope('weights'):
-                W = tf.get_variable('weights%i' % self.hidden_number,
-                                    shape=[self.last_layer_neurons, n_neurons],
-                                    dtype=self.input_dtype,
-                                    initializer=tf.contrib.layers.xavier_initializer(),
-                                    regularizer=None, trainable=True, collections=None)
-                # W = tf.Variable(tf.random_normal([self.last_layer_neurons, n_neurons],
-                #                                  mean=0.0, stddev=0.3, dtype=self.input_dtype,
-                #                                 seed=self.seed,))
+                # W = tf.get_variable('weights%i' % self.hidden_number,
+                #                     shape=[self.last_layer_neurons, n_neurons],
+                #                     dtype=self.input_dtype,
+                #                     initializer=tf.contrib.layers.xavier_initializer(),
+                #                     regularizer=None, trainable=True, collections=None)
+                W = tf.Variable(tf.random_normal([self.last_layer_neurons, n_neurons],
+                                                 mean=0.0, stddev=0.3, dtype=self.input_dtype,
+                                                seed=self.seed, name='weights'))
             with tf.name_scope('biases'):
-                b = tf.get_variable('biases%i' % self.hidden_number,
-                                    shape=[1, n_neurons],
-                                    dtype=self.input_dtype,
-                                    initializer=tf.contrib.layers.xavier_initializer(),
-                                    regularizer=None, trainable=True, collections=None)
-                # b = tf.Variable(tf.random_uniform([n_neurons, ], minval=0, maxval=0.1,
-                #                                   dtype=self.input_dtype, seed=self.seed))
+                # b = tf.get_variable('biases%i' % self.hidden_number,
+                #                     shape=[1, n_neurons],
+                #                     dtype=self.input_dtype,
+                #                     initializer=tf.contrib.layers.xavier_initializer(),
+                #                     regularizer=None, trainable=True, collections=None)
+                b = tf.Variable(tf.random_uniform([n_neurons, ], minval=0, maxval=0.1,
+                                                  dtype=self.input_dtype, seed=self.seed, name='biases'))
             with tf.name_scope('Wx_plus_b'):
                 product = tf.matmul(self.last_layer_outputs, W, name='Wx') + b
 
-            with tf.name_scope('activation'):
-                if activator is None:
-                    activated_product = product
-                else:
-                    activated_product = activator(product)
+
+            if activator is None:
+                activated_product = product
+            else:
+                activated_product = activator(product)
 
         self.hidden_number += 1
         self.last_layer_outputs = activated_product

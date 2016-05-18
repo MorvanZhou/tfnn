@@ -10,13 +10,16 @@ class RegressionNetwork(Network):
         self.l2 = l2
 
     def _init_loss(self):
-        with tf.name_scope('loss') as scope:
-            self.loss = tf.reduce_mean(tf.reduce_sum(
-                tf.square(self.target_placeholder - self.layers_output.iloc[-1], name='loss_square'),
-                reduction_indices=[1]), name='loss_mean')
-            regularizers = 0
-            for W in self.Ws:
-                regularizers += tf.nn.l2_loss(W, name='l2_reg')
-            self.loss += self.l2*regularizers
+        with tf.name_scope('loss'):
+            with tf.name_scope('loss_square'):
+                self.loss = tf.reduce_mean(tf.reduce_sum(
+                    tf.square(self.target_placeholder - self.layers_output.iloc[-1], name='loss_square'),
+                    reduction_indices=[1]), name='loss_mean')
+            with tf.name_scope('l2_reg'):
+                regularizers = 0
+                for W in self.Ws:
+                    regularizers += tf.nn.l2_loss(W, name='l2_reg')
+            with tf.name_scope('l2_loss'):
+                self.loss += self.l2*regularizers
 
 
