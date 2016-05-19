@@ -3,11 +3,13 @@ import tensorflow as tf
 
 
 class RegressionNetwork(Network):
-    def __init__(self, n_inputs, n_outputs, intput_dtype=tf.float32, output_dtype=tf.float32, l2=0, seed=None):
-        super(RegressionNetwork, self).__init__(n_inputs, n_outputs, intput_dtype, output_dtype, seed)
+    def __init__(self, n_inputs, n_outputs, intput_dtype=tf.float32, output_dtype=tf.float32,
+                 do_dropout=False, do_l2=False, seed=None):
+        output_activator = None
+        super(RegressionNetwork, self).__init__(
+            n_inputs, n_outputs, intput_dtype, output_dtype, output_activator,
+            do_dropout, do_l2, seed)
         self.name = 'Regression neural network'
-        self.output_activator = None
-        self.l2 = l2
 
     def _init_loss(self):
         with tf.name_scope('loss'):
@@ -15,11 +17,14 @@ class RegressionNetwork(Network):
                 self.loss = tf.reduce_mean(tf.reduce_sum(
                     tf.square(self.target_placeholder - self.layers_output.iloc[-1], name='loss_square'),
                     reduction_indices=[1]), name='loss_mean')
-            with tf.name_scope('l2_reg'):
-                regularizers = 0
-                for W in self.Ws:
-                    regularizers += tf.nn.l2_loss(W, name='l2_reg')
-            with tf.name_scope('l2_loss'):
-                self.loss += self.l2*regularizers
+
+            if self.reg == 'l2':
+                with tf.name_scope('l2_reg'):
+                    regularizers = 0
+                    for W in self.Ws:
+                        regularizers += tf.nn.l2_loss(W, name='l2_reg')
+                    regularizers *= self.l2_placeholder
+                with tf.name_scope('l2_loss'):
+                    self.loss += regularizers
 
 
