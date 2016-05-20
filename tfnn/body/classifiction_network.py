@@ -21,10 +21,11 @@ class ClassificationNetwork(Network):
         self.name = 'ClassificationNetwork'
 
     def _init_loss(self):
-        if self.method == 'softmax':
-            self.predictions = tf.nn.softmax(self.layers_final_output.iloc[-1], name='predictions')
-        elif self.method == 'sigmoid':
-            self.predictions = tf.nn.sigmoid(self.layers_final_output.iloc[-1], name='predictions')
+        with tf.name_scope('predictions'):
+            if self.method == 'softmax':
+                self.predictions = tf.nn.softmax(self.layers_final_output.iloc[-1], name='predictions')
+            elif self.method == 'sigmoid':
+                self.predictions = tf.nn.sigmoid(self.layers_final_output.iloc[-1], name='predictions')
         with tf.name_scope('loss'):
             if self.method == 'softmax':
                 self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
