@@ -60,7 +60,6 @@ class Network(object):
                 self._variable_summaries(b, layer_name + '/biases')
             with tf.name_scope('Wx_plus_b'):
                 product = tf.matmul(self.last_layer_outputs, W, name='Wx') + b
-                tf.histogram_summary(layer_name+'/product', product)
             if activator is None:
                 activated_product = product
             else:
@@ -75,7 +74,6 @@ class Network(object):
                 final_product = dropped_product
             else:
                 final_product = activated_product
-            tf.histogram_summary(layer_name+'/final_product', final_product)
 
         self.hidden_layer_number += 1
         self.last_layer_outputs = final_product

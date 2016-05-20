@@ -5,7 +5,6 @@ from tensorflow.examples.tutorials.mnist import input_data
 import tensorflow as tf
 import tfnn
 import numpy as np
-import os, shutil
 
 # mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
@@ -24,15 +23,10 @@ network = tfnn.ClassificationNetwork(4096, 40, do_dropout=True)
 # network.add_hidden_layer(100, activator=tf.nn.relu)
 # network.add_hidden_layer(10, activator=tf.nn.tanh)
 network.add_output_layer(activator=None)
-optimizer = tf.train.GradientDescentOptimizer(0.001)
+optimizer = tf.train.GradientDescentOptimizer(0.01)
 network.set_optimizer(optimizer)
 evaluator = tfnn.AccuracyEvaluator(network, v_data.xs, v_data.ys)
-graph_save_path = '/tmp/log'
-if 'log' in os.listdir('/tmp'):
-    shutil.rmtree(graph_save_path)
-merged = tf.merge_all_summaries()
-train_writer = tf.train.SummaryWriter(graph_save_path + '/train', network.sess.graph)
-test_writer = tf.train.SummaryWriter(graph_save_path + '/test', )
+summarizer = tfnn.Summarizer(network, save_path='/tmp/log')
 
 for i in range(1000):
     b_xs, b_ys = t_data.next_batch(50, loop=True)
@@ -41,15 +35,10 @@ for i in range(1000):
     # if i % 100 == 0:
     #     loss_value = network.get_loss(v_data.xs, v_data.ys)
     #     print(loss_value)
-    if i%50 == 0:
-        test_result = network.sess.run(merged, feed_dict={network.data_placeholder: v_data.xs,
-                                                          network.target_placeholder: v_data.ys,
-                                                          network.keep_prob_placeholder: 0.5})
-        train_result = network.sess.run(merged, feed_dict={network.data_placeholder: b_xs,
-                                                          network.target_placeholder: b_ys,
-                                                          network.keep_prob_placeholder: 1})
-        test_writer.add_summary(test_result, i)
-        train_writer.add_summary(train_result, i)
+    if i % 50 == 0:
+        print(evaluator.compute_accuracy())
+        summarizer.record_train(b_xs, b_ys, i, 0.5)
+        summarizer.record_validate(v_data.xs, v_data.ys, i)
 
 network.sess.close()
 

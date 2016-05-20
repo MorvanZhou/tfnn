@@ -4,14 +4,6 @@ import tensorflow as tf
 
 class ClassificationNetwork(Network):
     def __init__(self, n_inputs, n_outputs, method='softmax', do_dropout=False, do_l2=False, seed=None):
-        """
-
-        :param n_inputs:
-        :param n_outputs:
-        :param method: 'sparse_softmax' or 'softmax' or 'sigmoid'
-        :param dtype:
-        :param seed:
-        """
         if method == 'softmax':
             input_dtype = tf.float32
             output_dtype = tf.float32
@@ -26,7 +18,7 @@ class ClassificationNetwork(Network):
             n_inputs, n_outputs, input_dtype, output_dtype, output_activator,
             do_dropout, do_l2, seed)
         self.method = method
-        self.name = 'Classification neural network'
+        self.name = 'ClassificationNetwork'
 
     def _init_loss(self):
         if self.method == 'softmax':

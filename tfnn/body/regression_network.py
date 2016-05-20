@@ -9,7 +9,7 @@ class RegressionNetwork(Network):
         super(RegressionNetwork, self).__init__(
             n_inputs, n_outputs, intput_dtype, output_dtype, output_activator,
             do_dropout, do_l2, seed)
-        self.name = 'Regression neural network'
+        self.name = 'RegressionNetwork'
 
     def _init_loss(self):
         with tf.name_scope('loss'):
