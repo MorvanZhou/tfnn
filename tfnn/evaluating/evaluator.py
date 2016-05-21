@@ -3,7 +3,7 @@ import tfnn
 import matplotlib.pyplot as plt
 
 
-class AccuracyEvaluator(object):
+class Evaluator(object):
     def __init__(self, network, ):
         self.network = network
         if isinstance(self.network, tfnn.ClassificationNetwork):
@@ -32,6 +32,20 @@ class AccuracyEvaluator(object):
                          self.network.target_placeholder: ys}
 
         return self.accuracy.eval(feed_dict, self.network.sess)
+
+    def compute_cost(self, xs, ys):
+        if self.network.reg == 'dropout':
+            feed_dict = {self.network.data_placeholder: xs,
+                         self.network.target_placeholder: ys,
+                         self.network.keep_prob_placeholder: 1.}
+        elif self.network.reg == 'l2':
+            feed_dict = {self.network.data_placeholder: xs,
+                         self.network.target_placeholder: ys,
+                         self.network.l2_placeholder: 0.}
+        else:
+            feed_dict = {self.network.data_placeholder: xs,
+                         self.network.target_placeholder: ys}
+        return self.network.loss.eval(feed_dict, self.network.sess)
 
     def plot_single_output_comparison(self, v_xs, v_ys, continue_plot=False):
         if not isinstance(self.network, tfnn.RegressionNetwork):
