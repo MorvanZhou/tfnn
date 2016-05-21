@@ -2,7 +2,7 @@
 
 This is a high level module based on tensorflow
 
-Requirments:
+Requirements.
 1. tensorflow
 2. numpy
 3. pandas
