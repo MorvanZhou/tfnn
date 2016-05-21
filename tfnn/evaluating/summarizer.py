@@ -1,6 +1,6 @@
 import os
 import shutil
-import tensorflow as tf
+import tfnn
 
 
 class Summarizer(object):
@@ -9,9 +9,9 @@ class Summarizer(object):
         name_len = len(folder)
         if folder in os.listdir(save_path[:-name_len]):
             shutil.rmtree(save_path)
-        self.merged = tf.merge_all_summaries()
-        self.train_writer = tf.train.SummaryWriter(save_path + '/train', network.sess.graph)
-        self.validate_writer = tf.train.SummaryWriter(save_path + '/validate', )
+        self.merged = tfnn.merge_all_summaries()
+        self.train_writer = tfnn.train.SummaryWriter(save_path + '/train', network.sess.graph)
+        self.validate_writer = tfnn.train.SummaryWriter(save_path + '/validate', )
         self._network = network
         self.save_path = save_path
 

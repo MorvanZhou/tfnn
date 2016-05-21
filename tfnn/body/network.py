@@ -1,6 +1,5 @@
 import pandas as pd
-import tensorflow as tf
-import os, shutil
+import tfnn
 
 
 class Network(object):
@@ -21,15 +20,15 @@ class Network(object):
             self.reg = None
         self.seed = seed
 
-        with tf.name_scope('Inputs'):
-            self.data_placeholder = tf.placeholder(dtype=input_dtype, shape=[None, n_inputs], name='x_input')
-            self.target_placeholder = tf.placeholder(dtype=output_dtype, shape=[None, n_outputs], name='y_input')
+        with tfnn.name_scope('Inputs'):
+            self.data_placeholder = tfnn.placeholder(dtype=input_dtype, shape=[None, n_inputs], name='x_input')
+            self.target_placeholder = tfnn.placeholder(dtype=output_dtype, shape=[None, n_outputs], name='y_input')
             if do_dropout:
-                self.keep_prob_placeholder = tf.placeholder(dtype=tf.float32)
-                tf.scalar_summary('dropout_keep_probability', self.keep_prob_placeholder)
+                self.keep_prob_placeholder = tfnn.placeholder(dtype=tfnn.float32)
+                tfnn.scalar_summary('dropout_keep_probability', self.keep_prob_placeholder)
             if do_l2:
-                self.l2_placeholder = tf.placeholder(tf.float32)
-                tf.scalar_summary('l2_lambda', self.l2_placeholder)
+                self.l2_placeholder = tfnn.placeholder(tfnn.float32)
+                tfnn.scalar_summary('l2_lambda', self.l2_placeholder)
         self.layers_output = pd.Series([])
         self.layers_activated_output = pd.Series([])
         self.layers_dropped_output = pd.Series([])
@@ -45,28 +44,28 @@ class Network(object):
         """
         W shape(n_last_layer_neurons, n_this_layer_neurons]
         b shape(n_this_layer_neurons, ]
-        product = tf.matmul(x, W) + b
+        product = tfnn.matmul(x, W) + b
         :param n_neurons:
         :param activator:
         :return:
         """
         layer_name = 'layer_%i' % self.hidden_layer_number
-        with tf.name_scope(layer_name):
-            with tf.name_scope('weights'):
+        with tfnn.name_scope(layer_name):
+            with tfnn.name_scope('weights'):
                 W = self._weight_variable([self.last_layer_neurons, n_neurons])
                 self._variable_summaries(W, layer_name+'/weights')
-            with tf.name_scope('biases'):
+            with tfnn.name_scope('biases'):
                 b = self._bias_variable([n_neurons, ])
                 self._variable_summaries(b, layer_name + '/biases')
-            with tf.name_scope('Wx_plus_b'):
-                product = tf.matmul(self.last_layer_outputs, W, name='Wx') + b
+            with tfnn.name_scope('Wx_plus_b'):
+                product = tfnn.matmul(self.last_layer_outputs, W, name='Wx') + b
             if activator is None:
                 activated_product = product
             else:
                 activated_product = activator(product)
-            tf.histogram_summary(layer_name+'/activated_product', activated_product)
+            tfnn.histogram_summary(layer_name+'/activated_product', activated_product)
             if self.reg == 'dropout':
-                dropped_product = tf.nn.dropout(activated_product,
+                dropped_product = tfnn.nn.dropout(activated_product,
                                                 self.keep_prob_placeholder,
                                                 seed=self.seed, name='dropout')
                 self.layers_dropped_output.set_value(label=len(self.layers_dropped_output),
@@ -95,10 +94,10 @@ class Network(object):
         if not self.has_output_layer:
             raise NotImplementedError('Please add output layer.')
         self._init_loss()
-        with tf.name_scope('trian'):
+        with tfnn.name_scope('trian'):
             self.train_op = optimizer.minimize(self.loss, global_step)
-        self.sess = tf.Session()
-        _init = tf.initialize_all_variables()
+        self.sess = tfnn.Session()
+        _init = tfnn.initialize_all_variables()
         self.sess.run(_init)
 
     def run_step(self, feed_xs, feed_ys, *args):
@@ -145,25 +144,25 @@ class Network(object):
         return Ws
 
     def _weight_variable(self, shape):
-        initial = tf.random_normal(
+        initial = tfnn.random_normal(
             shape, mean=0.0, stddev=0.2, dtype=self.input_dtype, seed=self.seed, name='weights')
-        return tf.Variable(initial)
+        return tfnn.Variable(initial)
 
     def _bias_variable(self, shape):
-        initial = tf.constant(0.1, shape=shape, dtype=self.input_dtype, name='biases')
-        return tf.Variable(initial)
+        initial = tfnn.constant(0.1, shape=shape, dtype=self.input_dtype, name='biases')
+        return tfnn.Variable(initial)
 
     @staticmethod
     def _variable_summaries(var, name):
-        with tf.name_scope("summaries"):
-            mean = tf.reduce_mean(var)
-            tf.scalar_summary('mean/' + name, mean)
-            with tf.name_scope('stddev'):
-                stddev = tf.sqrt(tf.reduce_sum(tf.square(var - mean)))
-            tf.scalar_summary('sttdev/' + name, stddev)
-            tf.scalar_summary('max/' + name, tf.reduce_max(var))
-            tf.scalar_summary('min/' + name, tf.reduce_min(var))
-            tf.histogram_summary(name, var)
+        with tfnn.name_scope("summaries"):
+            mean = tfnn.reduce_mean(var)
+            tfnn.scalar_summary('mean/' + name, mean)
+            with tfnn.name_scope('stddev'):
+                stddev = tfnn.sqrt(tfnn.reduce_sum(tfnn.square(var - mean)))
+            tfnn.scalar_summary('sttdev/' + name, stddev)
+            tfnn.scalar_summary('max/' + name, tfnn.reduce_max(var))
+            tfnn.scalar_summary('min/' + name, tfnn.reduce_min(var))
+            tfnn.histogram_summary(name, var)
 
     def _init_loss(self):
         self.loss = None

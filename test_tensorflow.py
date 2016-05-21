@@ -2,13 +2,12 @@ import time
 from sklearn.datasets import fetch_olivetti_faces
 from sklearn.datasets import load_boston
 from tensorflow.examples.tutorials.mnist import input_data
-import tensorflow as tf
 import tfnn
 import numpy as np
 
 # mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
-tf.set_random_seed(100)
+tfnn.set_random_seed(100)
 
 # xs = load_boston().data
 # ys = load_boston().target
@@ -20,10 +19,10 @@ data.shuffle(inplace=True)
 data.to_binary(inplace=True)
 t_data, v_data = data.train_test_split()
 network = tfnn.ClassificationNetwork(data.xs.shape[1], data.ys.shape[1], do_dropout=True)
-network.add_hidden_layer(100, activator=tf.nn.relu)
+network.add_hidden_layer(100, activator=tfnn.nn.relu)
 # network.add_hidden_layer(10, activator=tf.nn.tanh)
-network.add_output_layer(activator=tf.nn.relu)
-optimizer = tf.train.AdamOptimizer(0.001)
+network.add_output_layer(activator=tfnn.nn.relu)
+optimizer = tfnn.train.AdamOptimizer(0.001)
 network.set_optimizer(optimizer)
 evaluator = tfnn.Evaluator(network)
 summarizer = tfnn.Summarizer(network, save_path='/tmp/log')

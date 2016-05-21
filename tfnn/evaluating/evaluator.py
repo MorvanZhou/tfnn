@@ -1,4 +1,3 @@
-import tensorflow as tf
 import tfnn
 import matplotlib.pyplot as plt
 
@@ -7,11 +6,11 @@ class Evaluator(object):
     def __init__(self, network, ):
         self.network = network
         if isinstance(self.network, tfnn.ClassificationNetwork):
-            with tf.name_scope('accuracy'):
-                correct_prediction = tf.equal(tf.argmax(network.predictions, 1),
-                                              tf.argmax(network.target_placeholder, 1), name='correct_prediction')
-                self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy')
-                tf.scalar_summary('accuracy', self.accuracy)
+            with tfnn.name_scope('accuracy'):
+                correct_prediction = tfnn.equal(tfnn.argmax(network.predictions, 1),
+                                              tfnn.argmax(network.target_placeholder, 1), name='correct_prediction')
+                self.accuracy = tfnn.reduce_mean(tfnn.cast(correct_prediction, tfnn.float32), name='accuracy')
+                tfnn.scalar_summary('accuracy', self.accuracy)
         elif isinstance(self.network, tfnn.RegressionNetwork):
             self.first_time = True
 
