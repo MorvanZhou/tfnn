@@ -97,10 +97,13 @@ class Network(object):
         with tfnn.name_scope('trian'):
             self.train_op = optimizer.minimize(self.loss, global_step)
         self.sess = tfnn.Session()
-        _init = tfnn.initialize_all_variables()
-        self.sess.run(_init)
 
     def run_step(self, feed_xs, feed_ys, *args):
+        if not hasattr(self, '_init'):
+            # initialize all variables
+            self._init = tfnn.initialize_all_variables()
+            self.sess.run(self._init)
+
         if self.reg == 'dropout':
             keep_prob = args[0]
             self.sess.run(self.train_op, feed_dict={self.data_placeholder: feed_xs,
