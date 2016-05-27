@@ -77,3 +77,33 @@ class Evaluator(object):
             plt.pause(0.001)
             plt.close(fig)
             plt.draw()
+
+    def plot_line_matching(self, v_xs, v_ys, continue_plot=False):
+        if not isinstance(self.network, tfnn.RegressionNetwork):
+            raise NotImplementedError('Can only compute accuracy for Regression neural network.')
+        if self.network.reg == 'dropout':
+            feed_dict = {self.network.data_placeholder: v_xs,
+                         self.network.target_placeholder: v_ys,
+                         self.network.keep_prob_placeholder: 1.}
+        elif self.network.reg == 'l2':
+            feed_dict = {self.network.data_placeholder: v_xs,
+                         self.network.target_placeholder: v_ys,
+                         self.network.l2_placeholder: 0.}
+        else:
+            feed_dict = {self.network.data_placeholder: v_xs,
+                         self.network.target_placeholder: v_ys}
+        predictions = self.network.predictions.eval(feed_dict, self.network.sess)
+        fig, ax = plt.subplots()
+        ax.scatter(v_xs, v_ys, c='red', s=20)
+        ax.scatter(v_xs, predictions, c='blue', s=20)
+        ax.set_xlabel('Input')
+        ax.set_ylabel('Output')
+        if self.first_time:
+            self.first_time = False
+            if continue_plot:
+                plt.ion()
+            plt.show()
+        else:
+            plt.pause(0.1)
+            plt.close(fig)
+            plt.draw()

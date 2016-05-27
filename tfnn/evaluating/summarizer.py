@@ -51,7 +51,7 @@ class Summarizer(object):
         validate_result = self._network.sess.run(self.merged, feed_dict)
         self.validate_writer.add_summary(validate_result, global_step)
 
-    def visualize(self):
+    def web_visualize(self):
         os.system('tensorboard --logdir=%s' % self.save_path)
 
 
