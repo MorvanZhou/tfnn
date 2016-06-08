@@ -35,6 +35,8 @@ class Network(object):
         self.layers_final_output = pd.Series([])
         self.Ws = pd.Series([])
         self.bs = pd.Series([])
+        self.record_activators = pd.Series([])
+        self.record_neurons = []
         self.last_layer_neurons = n_inputs
         self.last_layer_outputs = self.data_placeholder
         self.hidden_layer_number = 1
@@ -58,7 +60,7 @@ class Network(object):
                 b = self._bias_variable([n_neurons, ])
                 self._variable_summaries(b, layer_name + '/biases')
             with tfnn.name_scope('Wx_plus_b'):
-                product = tfnn.matmul(self.last_layer_outputs, W, name='Wx') + b
+                product = tfnn.add(tfnn.matmul(self.last_layer_outputs, W, name='Wx'), b, name='Wx_plus_b')
             if activator is None:
                 activated_product = product
             else:
@@ -78,6 +80,12 @@ class Network(object):
         self.last_layer_outputs = final_product
         self.Ws.set_value(label=len(self.Ws), value=W)
         self.bs.set_value(label=len(self.bs), value=b)
+        if activator is None:
+            self.record_activators.set_value(label=len(self.record_activators), value=None)
+        else:
+            self.record_activators.set_value(label=len(self.record_activators), value=activator(0).name)
+        self.record_neurons.append(n_neurons)
+
         self.layers_output.set_value(label=len(self.layers_output),
                                      value=product)
         self.layers_activated_output.set_value(label=len(self.layers_output),
@@ -88,12 +96,14 @@ class Network(object):
 
     def add_output_layer(self, activator):
         self.add_hidden_layer(self.n_outputs, activator)
+        self._init_loss()
         self.has_output_layer = True
 
-    def set_optimizer(self, optimizer, global_step=None,):
+    def set_optimizer(self, optimizer=None, global_step=None,):
+        if optimizer is None:
+            optimizer = tfnn.train.GradientDescentOptimizer(0.001)
         if not self.has_output_layer:
             raise NotImplementedError('Please add output layer.')
-        self._init_loss()
         with tfnn.name_scope('trian'):
             self.train_op = optimizer.minimize(self.loss, global_step)
         self.sess = tfnn.Session()
@@ -145,6 +155,10 @@ class Network(object):
                 raise IndexError('Do not have layer %i' % layer)
             Ws = self.sess.run(self.Ws[layer])
         return Ws
+
+    def predict(self, xs):
+        predictions = self.sess.run(self.predictions, feed_dict={self.data_placeholder: xs})
+        return predictions
 
     def _weight_variable(self, shape):
         initial = tfnn.random_normal(

@@ -1,12 +1,12 @@
 import numpy as np
 import copy
 
-from tfnn.data_sets.normalize import std_normalize as data_sets_std_normalize
-from tfnn.data_sets.normalize import minmax_normalize as data_sets_minmax_normalize
-from tfnn.data_sets.shuffle import shuffle as data_sets_shuffle
-from tfnn.data_sets.train_test_split import train_test_split as data_sets_train_test_split
-from tfnn.data_sets.to_binary import to_binary as data_sets_to_binary
-from tfnn.data_sets.sampled_batch import sampled_batch as data_sets_sampled_batch
+from tfnn.datasets.normalize import std_normalize as data_sets_std_normalize
+from tfnn.datasets.normalize import minmax_normalize as data_sets_minmax_normalize
+from tfnn.datasets.shuffle import shuffle as data_sets_shuffle
+from tfnn.datasets.train_test_split import train_test_split as data_sets_train_test_split
+from tfnn.datasets.to_binary import to_binary as data_sets_to_binary
+from tfnn.datasets.sampled_batch import sampled_batch as data_sets_sampled_batch
 
 
 class Data:

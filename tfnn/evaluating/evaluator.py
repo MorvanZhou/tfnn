@@ -47,6 +47,13 @@ class Evaluator(object):
         return self.network.loss.eval(feed_dict, self.network.sess)
 
     def plot_single_output_comparison(self, v_xs, v_ys, continue_plot=False):
+        """
+        Suitable for analysing the datasets with only one output unit.
+        :param v_xs: validated xs
+        :param v_ys: validated ys (single attribute)
+        :param continue_plot: True or False
+        :return: Plotting
+        """
         if not isinstance(self.network, tfnn.RegressionNetwork):
             raise NotImplementedError('Can only compute accuracy for Regression neural network.')
         if self.network.reg == 'dropout':
@@ -63,7 +70,7 @@ class Evaluator(object):
         predictions = self.network.predictions.eval(feed_dict, self.network.sess)
         fig, ax = plt.subplots()
         ax.scatter(v_ys, predictions)
-        ax.plot([v_ys.min(), v_ys.max()], [v_ys.min(), v_ys.max()], 'k--', lw=2)
+        ax.plot([v_ys.min(), v_ys.max()], [v_ys.min(), v_ys.max()], 'r--', lw=4)
         ax.grid(True)
         ax.set_xlabel('Real data')
         ax.set_ylabel('Predicted')
@@ -79,6 +86,13 @@ class Evaluator(object):
             plt.draw()
 
     def plot_line_matching(self, v_xs, v_ys, continue_plot=False):
+        """
+        Suitable for analysing the dataset with only one attribute and single output.
+        :param v_xs: Only has one attribute
+        :param v_ys: Only has one attribute
+        :param continue_plot: True or False
+        :return: plotting
+        """
         if not isinstance(self.network, tfnn.RegressionNetwork):
             raise NotImplementedError('Can only compute accuracy for Regression neural network.')
         if self.network.reg == 'dropout':
