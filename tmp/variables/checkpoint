@@ -1,2 +1,2 @@
-model_checkpoint_path: "/Users/MorvanZhou/Documents/python/2016_05_21_tfnn/tmp/variables/network.ckpt"
-all_model_checkpoint_paths: "/Users/MorvanZhou/Documents/python/2016_05_21_tfnn/tmp/variables/network.ckpt"
+model_checkpoint_path: "/home/morvan/Documents/python/tfnn/tmp/variables/network.ckpt"
+all_model_checkpoint_paths: "/home/morvan/Documents/python/tfnn/tmp/variables/network.ckpt"

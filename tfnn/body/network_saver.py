@@ -8,6 +8,12 @@ class NetworkSaver(object):
     Save, rebuild and restore network.
     """
     def save(self, network, data, path='/tmp/'):
+        """
+        save network config and normalized data config
+        :param network: trained network
+        :param data: normalized data
+        :param path: save to path
+        """
         saver = tfnn.train.Saver()
         save_path = os.getcwd() + path
         variables_path = save_path+'variables/'
@@ -27,7 +33,7 @@ class NetworkSaver(object):
         print("Model saved in file: %s" % save_path)
         self._network = network
 
-    def rebuild(self, path):
+    def rebuild(self, path='/tmp/'):
         config_path = os.getcwd() + path + '/config/network_config.pickle'
         with open(config_path, 'rb') as file:
             network_config = pickle.load(file)
