@@ -33,7 +33,7 @@ class NetworkSaver(object):
         print("Model saved in file: %s" % save_path)
         self._network = network
 
-    def rebuild(self, path='/tmp/'):
+    def restore(self, path='/tmp/'):
         config_path = os.getcwd() + path + '/config/network_config.pickle'
         with open(config_path, 'rb') as file:
             network_config = pickle.load(file)
@@ -70,21 +70,9 @@ class NetworkSaver(object):
                 network.add_output_layer(activator)
             network.sess = tfnn.Session()
         self._network = network
-        return [network, input_filter]
-
-    def restore(self, path):
-        """
-        Must apply after all network components has been built and before network.sess.run(init).
-        Note that when you restore variables from a file you do not have to initialize them beforehand.
-        :param path: path to save
-        :return: network with loaded variables
-        """
-        if not hasattr(self, '_network'):
-            # initialize all variables
-            raise SystemError('Have not run NetworkSaver.rebuild()')
         saver = tfnn.train.Saver()
         self._network._init = tfnn.initialize_all_variables()
         self._network.sess.run(self._network._init)
         saver.restore(self._network.sess, os.getcwd() + path + '/variables/network.ckpt')
         print('Model restored.')
-        return self._network
+        return [self._network, input_filter]

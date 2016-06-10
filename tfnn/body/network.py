@@ -163,6 +163,8 @@ class Network(object):
 
     def predict(self, xs):
         predictions = self.sess.run(self.predictions, feed_dict={self.data_placeholder: xs})
+        if predictions.size == 1:
+            predictions = predictions[0][0]
         return predictions
 
     def _weight_variable(self, shape):
