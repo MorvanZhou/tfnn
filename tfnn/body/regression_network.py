@@ -15,7 +15,7 @@ class RegressionNetwork(Network):
         with tfnn.name_scope('predictions'):
             self.predictions = self.layers_final_output.iloc[-1] + 0
         with tfnn.name_scope('loss'):
-            loss_square = tfnn.square(self.target_placeholder - self.layers_output.iloc[-1], name='loss_square')
+            loss_square = tfnn.square(self.target_placeholder - self.layers_final_output.iloc[-1], name='loss_square')
             loss_sum = tfnn.reduce_sum(loss_square, reduction_indices=[1], name='loss_sum')
             self.loss = tfnn.reduce_mean(loss_sum, name='loss_mean')
 

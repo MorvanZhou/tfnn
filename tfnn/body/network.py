@@ -20,7 +20,7 @@ class Network(object):
             self.reg = None
         self.seed = seed
 
-        with tfnn.name_scope('Inputs'):
+        with tfnn.name_scope('inputs'):
             self.data_placeholder = tfnn.placeholder(dtype=input_dtype, shape=[None, n_inputs], name='x_input')
             self.target_placeholder = tfnn.placeholder(dtype=output_dtype, shape=[None, n_outputs], name='y_input')
             if do_dropout:
@@ -41,17 +41,21 @@ class Network(object):
         self.last_layer_outputs = self.data_placeholder
         self.hidden_layer_number = 1
         self.has_output_layer = False
+        self._is_output_layer = False
 
-    def add_hidden_layer(self, n_neurons, activator=None):
+    def add_hidden_layer(self, n_neurons, activator=None, dropout_layer=False):
         """
         W shape(n_last_layer_neurons, n_this_layer_neurons]
         b shape(n_this_layer_neurons, ]
         product = tfnn.matmul(x, W) + b
-        :param n_neurons:
-        :param activator:
+        :param n_neurons: Number of neurons in this layer
+        :param activator: The activation function
         :return:
         """
-        layer_name = 'layer_%i' % self.hidden_layer_number
+        if not self._is_output_layer:
+            layer_name = 'hidden_layer%i' % self.hidden_layer_number
+        else:
+            layer_name = 'output_layer'
         with tfnn.name_scope(layer_name):
             with tfnn.name_scope('weights'):
                 W = self._weight_variable([self.last_layer_neurons, n_neurons])
@@ -66,7 +70,7 @@ class Network(object):
             else:
                 activated_product = activator(product)
             tfnn.histogram_summary(layer_name+'/activated_product', activated_product)
-            if self.reg == 'dropout':
+            if (self.reg == 'dropout') and dropout_layer:
                 dropped_product = tfnn.nn.dropout(activated_product,
                                                 self.keep_prob_placeholder,
                                                 seed=self.seed, name='dropout')
@@ -94,8 +98,9 @@ class Network(object):
                                            value=final_product)
         self.last_layer_neurons = n_neurons
 
-    def add_output_layer(self, activator):
-        self.add_hidden_layer(self.n_outputs, activator)
+    def add_output_layer(self, activator, dropout_layer=False):
+        self._is_output_layer = True
+        self.add_hidden_layer(self.n_outputs, activator, dropout_layer)
         self._init_loss()
         self.has_output_layer = True
 
