@@ -12,3 +12,4 @@ from tfnn.datasets.normalize_filter import NormalizeFilter
 
 from tfnn.evaluating.evaluator import Evaluator
 from tfnn.evaluating.summarizer import Summarizer
+from tfnn.evaluating.live_visualizer import LiveVisualizer

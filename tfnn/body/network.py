@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import tfnn
 
 
@@ -114,6 +115,10 @@ class Network(object):
         self.sess = tfnn.Session()
 
     def run_step(self, feed_xs, feed_ys, *args):
+        if np.ndim(feed_xs) == 1:
+            feed_xs = feed_xs[np.newaxis, :]
+        if np.ndim(feed_ys) == 1:
+            feed_ys = feed_ys[np.newaxis, :]
         if not hasattr(self, '_init'):
             # initialize all variables
             self._init = tfnn.initialize_all_variables()
@@ -162,6 +167,8 @@ class Network(object):
         return Ws
 
     def predict(self, xs):
+        if np.ndim(xs) == 1:
+            xs = xs[np.newaxis, :]
         predictions = self.sess.run(self.predictions, feed_dict={self.data_placeholder: xs})
         if predictions.size == 1:
             predictions = predictions[0][0]

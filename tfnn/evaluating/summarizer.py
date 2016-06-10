@@ -16,7 +16,6 @@ class Summarizer(object):
             self.validate_writer = tfnn.train.SummaryWriter(save_path + '/validate', )
             self._network = network
 
-
     def record_train(self, t_xs, t_ys, global_step, *args):
         if self._network.reg == 'dropout':
             if len(args) != 1:

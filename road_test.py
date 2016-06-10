@@ -41,7 +41,7 @@ def compare_real(data_path):
     load_data = pd.read_pickle(data_path)
     s, f = 700, 1000
     xs = load_data.iloc[s:f, 9:]
-    ys = load_data.a[s:f][:, np.newaxis]
+    ys = load_data.a[s:f]
     network_saver = tfnn.NetworkSaver()
     restore_path = '/tmp/'
     network, input_filter = network_saver.restore(restore_path)
@@ -65,8 +65,9 @@ def test():
     network_saver = tfnn.NetworkSaver()
     restore_path = '/tmp/'
     network, input_filter = network_saver.restore(restore_path)
+    lv = tfnn.LiveVisualizer(network)
     cars = []
-    for i in range(6):
+    for i in range(2):
         cars.append(Car(i*-15))
 
     for i in range(40*10):
@@ -97,8 +98,9 @@ def test():
                     vs_data.reverse()
                     vs_l_data = cars[j-1].vs[-10:]
                     vs_l_data.reverse()
-                    xs_data = np.array(ss_data+vs_data+vs_l_data)[np.newaxis, :]
+                    xs_data = np.array(ss_data+vs_data+vs_l_data)
                     a = network.predict(input_filter.filter(xs_data))
+                    lv.update(xs_data)
                     if a < -4:
                         a = 0
 
@@ -149,5 +151,5 @@ def test():
 if __name__ == '__main__':
     path = r'road data/1s_all_data.pickle'
     # train(path)
-    compare_real(path)
-    # test()
+    # compare_real(path)
+    test()

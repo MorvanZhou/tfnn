@@ -22,9 +22,9 @@ class Data:
         if 'pandas' in type(ys).__module__:
             ys = ys.as_matrix()
 
-        if len(xs.shape) == 1:
+        if xs.ndim == 1:
             xs = xs[:, np.newaxis]
-        if len(ys.shape) == 1:
+        if ys.ndim == 1:
             ys = ys[:, np.newaxis]
         xs_type, ys_type = type(xs).__module__, type(ys).__module__
         if xs_type == np.__name__:
