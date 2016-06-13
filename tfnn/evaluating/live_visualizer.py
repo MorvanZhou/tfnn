@@ -9,7 +9,7 @@ class VisualWindow(pyglet.window.Window):
         super(VisualWindow, self).__init__(width, height, resizable=True,
                                            caption='Neuron Visualizer')
         self._network = network
-        self.set_location(x=500, y=30)
+        #self.set_location(x=500, y=30)
         self.icon_image = pyglet.image.load('tfnn/evaluating/neuron.png')
         self.set_icon(self.icon_image)
         self.xs = None
@@ -43,8 +43,11 @@ class VisualWindow(pyglet.window.Window):
         self.clear()
         self.neurons_batch.draw()
 
-    def update(self, dt):
-        self.draw_neurons()
+    def update(self, dt, func):
+        xs_data = func()
+        if xs_data is not None:
+            self.xs = xs_data
+            self.draw_neurons()
 
     def draw_neurons(self):
         if self.xs != self.xs_buffer:
@@ -79,10 +82,24 @@ class VisualWindow(pyglet.window.Window):
 
 
 class LiveVisualizer(object):
-    def __init__(self, network):
+    def __init__(self, network, func):
         self.window = VisualWindow(network, width=800, height=600)
-        pyglet.clock.schedule_interval(self.window.update, 1 / 30)
+        pyglet.clock.schedule_interval(self.window.update, 1, func)
         pyglet.app.run()
 
-    def update(self, xs):
-        self.window.xs = xs
+
+def wrapper(func):
+    def times(a, b):
+        print(1, a*b)
+        c = func(a, b)
+        return c
+    return times
+
+@wrapper
+def test(a, b):
+    print(2, a+b)
+    return a+b+b
+
+if __name__ == '__main__':
+    a = test(1,2)
+    print(3, a)

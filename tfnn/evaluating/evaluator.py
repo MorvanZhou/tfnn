@@ -69,9 +69,10 @@ class Evaluator(object):
                          self.network.target_placeholder: v_ys}
         predictions = self.network.predictions.eval(feed_dict, self.network.sess)
         fig, ax = plt.subplots()
-        ax.scatter(v_ys, predictions)
-        ax.plot([v_ys.min(), v_ys.max()], [v_ys.min(), v_ys.max()], 'r--', lw=4)
+        ax.scatter(v_ys, predictions, label='predicted')
+        ax.plot([v_ys.min(), v_ys.max()], [v_ys.min(), v_ys.max()], 'r--', lw=4, label='real')
         ax.grid(True)
+        ax.legend()
         ax.set_xlabel('Real data')
         ax.set_ylabel('Predicted')
 

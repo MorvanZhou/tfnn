@@ -18,7 +18,7 @@ def train(data_path):
     network.add_output_layer(activator=None, dropout_layer=False)
     global_step = tfnn.Variable(0, trainable=False)
     # lr = tfnn.train.exponential_decay(0.001, global_step, 2000, 0.9)
-    optimizer = tfnn.train.AdamOptimizer(0.0004)
+    optimizer = tfnn.train.AdamOptimizer(0.0001)
     network.set_optimizer(optimizer, global_step)
     evaluator = tfnn.Evaluator(network)
     summarizer = tfnn.Summarizer(save_path='/tmp/log', network=network)
@@ -65,9 +65,9 @@ def test():
     network_saver = tfnn.NetworkSaver()
     restore_path = '/tmp/'
     network, input_filter = network_saver.restore(restore_path)
-    lv = tfnn.LiveVisualizer(network)
+
     cars = []
-    for i in range(2):
+    for i in range(8):
         cars.append(Car(i*-15))
 
     for i in range(40*10):
@@ -100,7 +100,7 @@ def test():
                     vs_l_data.reverse()
                     xs_data = np.array(ss_data+vs_data+vs_l_data)
                     a = network.predict(input_filter.filter(xs_data))
-                    lv.update(xs_data)
+
                     if a < -4:
                         a = 0
 
