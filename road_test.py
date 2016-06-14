@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 def train(data_path):
     load_data = pd.read_pickle(data_path)
-    xs = load_data.iloc[:, 9:]
+    xs = load_data.iloc[:, 1:]
     print(xs.head(2))
     ys = load_data.a
     data = tfnn.Data(xs, ys, name='road_data')
@@ -18,20 +18,20 @@ def train(data_path):
     network.add_output_layer(activator=None, dropout_layer=False)
     global_step = tfnn.Variable(0, trainable=False)
     # lr = tfnn.train.exponential_decay(0.001, global_step, 2000, 0.9)
-    optimizer = tfnn.train.AdamOptimizer(0.0001)
+    optimizer = tfnn.train.AdamOptimizer(0.001)
     network.set_optimizer(optimizer, global_step)
     evaluator = tfnn.Evaluator(network)
     summarizer = tfnn.Summarizer(save_path='/tmp/log', network=network)
 
-    for i in range(60000):
-        b_xs, b_ys = t_data.next_batch(1000, loop=True)
+    for i in range(20000):
+        b_xs, b_ys = t_data.next_batch(100, loop=True)
         network.run_step(b_xs, b_ys, 0.5)
         if i % 1000 == 0:
             print(evaluator.compute_cost(v_data.xs, v_data.ys))
             summarizer.record_train(b_xs, b_ys, i, 0.5)
             summarizer.record_validate(v_data.xs, v_data.ys, i)
-    network_saver = tfnn.NetworkSaver()
-    network_saver.save(network, data)
+    # network_saver = tfnn.NetworkSaver()
+    # network_saver.save(network, data)
     evaluator.plot_single_output_comparison(v_data.xs, v_data.ys, False)
     summarizer.web_visualize()
     network.sess.close()
@@ -149,7 +149,7 @@ def test():
 
 
 if __name__ == '__main__':
-    path = r'road data/1s_all_data.pickle'
-    # train(path)
+    path = r'road data/train_I80_lane1.pickle'
+    train(path)
     # compare_real(path)
-    test()
+    # test()
