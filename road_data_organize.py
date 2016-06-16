@@ -84,6 +84,7 @@ def filter_second(path, second,):
     train_data_dropped = train_data.dropna(axis=0, how='any')
     # drop spacing > 200 m
     print(np.amax(train_data_dropped.iloc[:,-10:]))
+
     train_data_dropped.to_pickle('train_I80_lane1.pickle')
 
 if __name__ == '__main__':
