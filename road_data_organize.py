@@ -75,19 +75,25 @@ def filter_second(path, second,):
         raise ValueError('second should between 0 and 2 second')
     df = pd.read_pickle(path)
     mini_second = int(second*10)
-    selected_v = df.iloc[:, (24-mini_second):24]
-    selected_v_l = df.iloc[:, 44-mini_second:44]
-    selected_s = df.iloc[:, 64-mini_second:64]
-    acceleration = df.iloc[:, 3]
+    selected_v = df.iloc[:, (24-mini_second):24].copy()
+    selected_v_l = df.iloc[:, 44-mini_second:44].copy()
+    selected_s = df.iloc[:, 64-mini_second:64].copy()
+    acceleration = df.iloc[:, 3].copy()
+
+    # assign np.nan to spacing where it > 100m
+    # selected_s[selected_s > 100] = np.nan
+
+    # assign np.nan to acceleration where it = 3.41376 and -3.41376
+    acceleration[acceleration == 3.41376] = np.nan
+    acceleration[acceleration == -3.41376] = np.nan
+
     train_data = pd.concat((acceleration, selected_v, selected_v_l, selected_s), axis=1, copy=True)
     # drop np.nan data
     train_data_dropped = train_data.dropna(axis=0, how='any')
-    # drop spacing > 200 m
-    print(np.amax(train_data_dropped.iloc[:,-10:]))
-
-    train_data_dropped.to_pickle('train_I80_lane1.pickle')
+    train_data_dropped.to_pickle('road data/train_I80_lane_' + path[-8] + '_' + str(second) + 's.pickle')
+    # train_data_dropped.to_csv('road data/train_I80_lane_'+path[-8]+'_'+str(second)+'s.csv')
 
 if __name__ == '__main__':
     # convert_from_txt('trajectories-0820am-0835am.txt', save_example=False, road='US101')
-    data_organize('road data/I80/trajectories-0400-0415.pickle', lane=4)
-    # filter_second('road data/I80/0400-0415-lane1.pickle', 1)
+    # data_organize('road data/I80/trajectories-0400-0415.pickle', lane=4)
+    filter_second('road data/I80/0400-0415-lane1.pickle', 1)

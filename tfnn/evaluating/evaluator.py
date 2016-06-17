@@ -1,5 +1,6 @@
 import tfnn
 import matplotlib.pyplot as plt
+plt.style.use('ggplot')
 
 
 class Evaluator(object):
@@ -80,6 +81,7 @@ class Evaluator(object):
             self.first_time = False
             if continue_plot:
                 plt.ion()
+            plt.pause(0.5)
             plt.show()
         else:
             plt.pause(0.001)
@@ -117,8 +119,10 @@ class Evaluator(object):
             self.first_time = False
             if continue_plot:
                 plt.ion()
+            plt.pause(0.5)
             plt.show()
         else:
             plt.pause(0.1)
             plt.close(fig)
             plt.draw()
+

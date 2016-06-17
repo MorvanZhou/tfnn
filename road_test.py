@@ -5,16 +5,17 @@ import matplotlib.pyplot as plt
 
 
 def train(data_path):
-    load_data = pd.read_pickle(data_path)
+    load_data = pd.read_pickle(data_path).iloc[:10000, :]
     xs = load_data.iloc[:, 1:]
     print(xs.head(2))
+    print('sample size:', pd.read_pickle(data_path).shape[0])
     ys = load_data.a
     data = tfnn.Data(xs, ys, name='road_data')
     data.minmax_normalize(inplace=True)
     t_data, v_data = data.train_test_split(0.7)
 
-    network = tfnn.RegressionNetwork(xs.shape[1], 1, do_dropout=True)
-    network.add_hidden_layer(200, activator=tfnn.nn.relu, dropout_layer=True)
+    network = tfnn.RegressionNetwork(xs.shape[1], 1, do_dropout=False)
+    network.add_hidden_layer(100, activator=tfnn.nn.relu, dropout_layer=True)
     network.add_output_layer(activator=None, dropout_layer=False)
     global_step = tfnn.Variable(0, trainable=False)
     # lr = tfnn.train.exponential_decay(0.001, global_step, 2000, 0.9)
@@ -23,24 +24,25 @@ def train(data_path):
     evaluator = tfnn.Evaluator(network)
     summarizer = tfnn.Summarizer(save_path='/tmp/log', network=network)
 
-    for i in range(20000):
+    for i in range(10000):
         b_xs, b_ys = t_data.next_batch(100, loop=True)
         network.run_step(b_xs, b_ys, 0.5)
         if i % 1000 == 0:
             print(evaluator.compute_cost(v_data.xs, v_data.ys))
             summarizer.record_train(b_xs, b_ys, i, 0.5)
             summarizer.record_validate(v_data.xs, v_data.ys, i)
-    # network_saver = tfnn.NetworkSaver()
-    # network_saver.save(network, data)
-    evaluator.plot_single_output_comparison(v_data.xs, v_data.ys, False)
-    summarizer.web_visualize()
+    network_saver = tfnn.NetworkSaver()
+    network_saver.save(network, data)
     network.sess.close()
+    evaluator.plot_single_output_comparison(v_data.xs, v_data.ys, continue_plot=True)
+    summarizer.web_visualize()
+
 
 
 def compare_real(data_path):
     load_data = pd.read_pickle(data_path)
-    s, f = 700, 1000
-    xs = load_data.iloc[s:f, 9:]
+    s, f = 10700, 10900
+    xs = load_data.iloc[s:f, 1:]
     ys = load_data.a[s:f]
     network_saver = tfnn.NetworkSaver()
     restore_path = '/tmp/'
@@ -65,51 +67,59 @@ def test():
     network_saver = tfnn.NetworkSaver()
     restore_path = '/tmp/'
     network, input_filter = network_saver.restore(restore_path)
-
+    test_time = 60
     cars = []
     for i in range(8):
         cars.append(Car(i*-15))
 
-    for i in range(40*10):
+    for i in range(test_time*10):
         for j in range(len(cars)):
             if j == 0:
                 if i < 1*10:
                     a = 0
-                elif 1*10 <= i < 8*10:
-                    a = 1.5
-                elif 8*10 <= i < 20*10:
+                elif 1*10 <= i < 15*10:
+                    a = 2
+                elif 15*10 <= i < 20*10:
                     a = 0
-                elif 20*10 <= i < 22*10:
+                elif 20*10 <= i < 28*10:
                     a = -3
-                elif 22*10 <= i < 25*10:
-                    a = -1.5
+                elif 28*10 <= i < 30*10:
+                    a = 0
+                elif 30*10 <= i < 35*10:
+                    a = 3
+                elif 35 * 10 <= i < 37 * 10:
+                    a = 0
+                elif 37 * 10 <= i < 45 * 10:
+                    a = -1
+                elif 45 * 10 <= i < 50 * 10:
+                    a = 2
                 else:
                     a = 0
                 cars[0].ps.append(cars[0].ps[-1] + cars[0].vs[-1] * 0.1 + 1/2*cars[0].acs[-1]*0.1**2)
-                cars[0].vs.append(cars[0].vs[-1]+0.1*a)
+                v = cars[0].vs[-1] + 0.1 * a
+                if v < 0:
+                    v = 0
+                cars[0].vs.append(v)
                 cars[0].acs.append(a)
             else:
                 if i <= 1*10:
                     a = 0
                 else:
                     ss_data = cars[j].ss[-10:]
-                    ss_data.reverse()
                     vs_data = cars[j].vs[-10:]
-                    vs_data.reverse()
                     vs_l_data = cars[j-1].vs[-10:]
-                    vs_l_data.reverse()
                     xs_data = np.array(ss_data+vs_data+vs_l_data)
                     a = network.predict(input_filter.filter(xs_data))
 
-                    if a < -4:
-                        a = 0
-
                 cars[j].ps.append(cars[j].ps[-1] + cars[j].vs[-1] * 0.1 + 1 / 2 * cars[j].acs[-1] * 0.1 ** 2)
-                cars[j].vs.append(cars[j].vs[-1] + 0.1 * a)
+                v = cars[j].vs[-1] + 0.1 * a
+                if v < 0:
+                    v = 0
+                cars[j].vs.append(v)
                 cars[j].acs.append(a)
                 cars[j].ss.append(cars[j-1].ps[-1]-cars[j].ps[-1])
 
-    xs = list(range(40 * 10 + 1))
+    xs = list(range(test_time * 10 + 1))
     plt.figure(1)
     plt.subplot(411)
     for i in range(len(cars)):
@@ -149,7 +159,7 @@ def test():
 
 
 if __name__ == '__main__':
-    path = r'road data/train_I80_lane1.pickle'
-    train(path)
+    path = r'road data/train_I80_lane_1_1s.pickle'
+    # train(path)
     # compare_real(path)
-    # test()
+    test()
