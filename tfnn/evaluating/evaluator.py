@@ -8,12 +8,43 @@ class Evaluator(object):
         self.network = network
         if isinstance(self.network, tfnn.ClassificationNetwork):
             with tfnn.name_scope('accuracy'):
-                correct_prediction = tfnn.equal(tfnn.argmax(network.predictions, 1),
-                                              tfnn.argmax(network.target_placeholder, 1), name='correct_prediction')
-                self.accuracy = tfnn.reduce_mean(tfnn.cast(correct_prediction, tfnn.float32), name='accuracy')
+                with tfnn.name_scope('correct_prediction'):
+                    correct_prediction = tfnn.equal(tfnn.argmax(network.predictions, 1),
+                                                  tfnn.argmax(network.target_placeholder, 1), name='correct_prediction')
+                with tfnn.name_scope('accuracy'):
+                    self.accuracy = tfnn.reduce_mean(tfnn.cast(correct_prediction, tfnn.float32), name='accuracy')
                 tfnn.scalar_summary('accuracy', self.accuracy)
         elif isinstance(self.network, tfnn.RegressionNetwork):
-            self.first_time = True
+            self.first_time_lm = True
+            self.first_time_soc = True
+        with tfnn.name_scope('r2_score'):
+            with tfnn.name_scope('ys_mean'):
+                ys_mean = tfnn.reduce_mean(network.target_placeholder, reduction_indices=[0], name='ys_mean')
+            with tfnn.name_scope('total_sum_squares'):
+                ss_tot = tfnn.reduce_sum(tfnn.square(network.target_placeholder - ys_mean),
+                                         reduction_indices=[0], name='total_sum_squares')
+            # ss_reg = np.sum(np.square(predictions-ys_mean), axis=0)
+            with tfnn.name_scope('residual_sum_squares'):
+                ss_res = tfnn.reduce_sum(tfnn.square(network.target_placeholder - network.predictions),
+                                         reduction_indices=[0], name='residual_sum_squares')
+            with tfnn.name_scope('coefficient_of_determination'):
+                self.r2_score = tfnn.sub(tfnn.constant(1, dtype=tfnn.float32), (ss_res / ss_tot)[0],
+                                         name='coefficient_of_determination')
+            tfnn.scalar_summary('r2_score', self.r2_score)
+
+    def compute_r2_score(self, xs, ys):
+        if self.network.reg == 'dropout':
+            feed_dict = {self.network.data_placeholder: xs,
+                         self.network.target_placeholder: ys,
+                         self.network.keep_prob_placeholder: 1.}
+        elif self.network.reg == 'l2':
+            feed_dict = {self.network.data_placeholder: xs,
+                         self.network.target_placeholder: ys,
+                         self.network.l2_placeholder: 0.}
+        else:
+            feed_dict = {self.network.data_placeholder: xs,
+                         self.network.target_placeholder: ys}
+        return self.r2_score.eval(feed_dict, self.network.sess)
 
     def compute_accuracy(self, xs, ys):
         if not isinstance(self.network, tfnn.ClassificationNetwork):
@@ -47,7 +78,7 @@ class Evaluator(object):
                          self.network.target_placeholder: ys}
         return self.network.loss.eval(feed_dict, self.network.sess)
 
-    def plot_single_output_comparison(self, v_xs, v_ys, continue_plot=False):
+    def regression_plot_linear_comparison(self, v_xs, v_ys, continue_plot=False):
         """
         Suitable for analysing the datasets with only one output unit.
         :param v_xs: validated xs
@@ -56,7 +87,9 @@ class Evaluator(object):
         :return: Plotting
         """
         if not isinstance(self.network, tfnn.RegressionNetwork):
-            raise NotImplementedError('Can only compute accuracy for Regression neural network.')
+            raise NotImplementedError('Can only plot for Regression neural network.')
+        elif v_ys.shape[1] > 1:
+            raise NotImplementedError('Can only support ys which have single value.')
         if self.network.reg == 'dropout':
             feed_dict = {self.network.data_placeholder: v_xs,
                          self.network.target_placeholder: v_ys,
@@ -69,26 +102,26 @@ class Evaluator(object):
             feed_dict = {self.network.data_placeholder: v_xs,
                          self.network.target_placeholder: v_ys}
         predictions = self.network.predictions.eval(feed_dict, self.network.sess)
-        fig, ax = plt.subplots()
-        ax.scatter(v_ys, predictions, label='predicted')
-        ax.plot([v_ys.min(), v_ys.max()], [v_ys.min(), v_ys.max()], 'r--', lw=4, label='real')
-        ax.grid(True)
-        ax.legend()
-        ax.set_xlabel('Real data')
-        ax.set_ylabel('Predicted')
 
-        if self.first_time:
-            self.first_time = False
+        if self.first_time_soc:
+            self.first_time_soc = False
+            self.fig_soc, self.ax_soc = plt.subplots()
+            self.scat_soc = self.ax_soc.scatter(v_ys, predictions, label='predicted')
+            self.ax_soc.plot([v_ys.min(), v_ys.max()], [v_ys.min(), v_ys.max()], 'r--', lw=4, label='real')
+            self.ax_soc.grid(True)
+            self.ax_soc.legend()
+            self.ax_soc.set_xlabel('Real data')
+            self.ax_soc.set_ylabel('Predicted')
             if continue_plot:
                 plt.ion()
-            plt.pause(0.5)
             plt.show()
         else:
-            plt.pause(0.001)
-            plt.close(fig)
+            plt.pause(0.1)
+            self.scat_soc.remove()
+            self.scat_soc = self.ax_soc.scatter(v_ys, predictions, label='predicted')
             plt.draw()
 
-    def plot_line_matching(self, v_xs, v_ys, continue_plot=False):
+    def regression_plot_nonlinear_comparison(self, v_xs, v_ys, continue_plot=False):
         """
         Suitable for analysing the dataset with only one attribute and single output.
         :param v_xs: Only has one attribute
@@ -97,7 +130,9 @@ class Evaluator(object):
         :return: plotting
         """
         if not isinstance(self.network, tfnn.RegressionNetwork):
-            raise NotImplementedError('Can only compute accuracy for Regression neural network.')
+            raise NotImplementedError('Can only plot this result for Regression neural network.')
+        elif v_ys.shape[1] > 1:
+            raise NotImplementedError('Can only support ys which have single value.')
         if self.network.reg == 'dropout':
             feed_dict = {self.network.data_placeholder: v_xs,
                          self.network.target_placeholder: v_ys,
@@ -110,19 +145,20 @@ class Evaluator(object):
             feed_dict = {self.network.data_placeholder: v_xs,
                          self.network.target_placeholder: v_ys}
         predictions = self.network.predictions.eval(feed_dict, self.network.sess)
-        fig, ax = plt.subplots()
-        ax.scatter(v_xs, v_ys, c='red', s=20)
-        ax.scatter(v_xs, predictions, c='blue', s=20)
-        ax.set_xlabel('Input')
-        ax.set_ylabel('Output')
-        if self.first_time:
-            self.first_time = False
+        if self.first_time_lm:
+            self.first_time_lm = False
+            self.fig_lm, self.ax_lm = plt.subplots()
+            self.ax_lm.scatter(v_xs, v_ys, c='red', s=20)
+            self.scat_lm = self.ax_lm.scatter(v_xs, predictions, c='blue', s=20)
+            self.ax_lm.set_xlabel('Input')
+            self.ax_lm.set_ylabel('Output')
             if continue_plot:
                 plt.ion()
-            plt.pause(0.5)
             plt.show()
         else:
             plt.pause(0.1)
-            plt.close(fig)
+            self.scat_lm.remove()
+            self.scat_lm = self.ax_lm.scatter(v_xs, predictions, c='blue', s=20)
+
             plt.draw()
 

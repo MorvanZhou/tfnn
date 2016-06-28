@@ -1,8 +1,6 @@
 import numpy as np
 import copy
 
-from tfnn.datasets.normalize import std_normalize as data_sets_std_normalize
-from tfnn.datasets.normalize import minmax_normalize as data_sets_minmax_normalize
 from tfnn.datasets.shuffle import shuffle as data_sets_shuffle
 from tfnn.datasets.train_test_split import train_test_split as data_sets_train_test_split
 from tfnn.datasets.to_binary import to_binary as data_sets_to_binary
@@ -37,18 +35,6 @@ class Data:
             raise ValueError('Data have to be numpy or pandas.core.frame')
         self.n_samples = ys.shape[0]
         self.name = name
-
-    def std_normalize(self, mean=0, std=1, inplace=False):
-        if inplace:
-            data_sets_std_normalize(self, mean, std, inplace)
-        else:
-            return data_sets_std_normalize(self, mean, std, inplace)
-
-    def minmax_normalize(self, lower_bound=-1, upper_bound=1, inplace=False):
-        if inplace:
-            data_sets_minmax_normalize(self, lower_bound, upper_bound, inplace)
-        else:
-            return data_sets_minmax_normalize(self, lower_bound, upper_bound, inplace)
 
     def shuffle(self, inplace=False):
         if inplace:

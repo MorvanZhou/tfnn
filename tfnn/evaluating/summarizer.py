@@ -4,17 +4,16 @@ import tfnn
 
 
 class Summarizer(object):
-    def __init__(self, save_path='/tmp/log', network=None):
+    def __init__(self, network, save_path='/tmp/log', ):
         self.save_path = save_path
-        if network is not None:
-            folder = save_path.split('/')[-1]
-            name_len = len(folder)
-            if folder in os.listdir(save_path[:-name_len]):
-                shutil.rmtree(save_path)
-            self.merged = tfnn.merge_all_summaries()
-            self.train_writer = tfnn.train.SummaryWriter(save_path + '/train', network.sess.graph)
-            self.validate_writer = tfnn.train.SummaryWriter(save_path + '/validate', )
-            self._network = network
+        folder = save_path.split('/')[-1]
+        name_len = len(folder)
+        if folder in os.listdir(save_path[:-name_len]):
+            shutil.rmtree(save_path)
+        self.merged = tfnn.merge_all_summaries()
+        self.train_writer = tfnn.train.SummaryWriter(save_path + '/train', network.sess.graph)
+        self.validate_writer = tfnn.train.SummaryWriter(save_path + '/validate', )
+        self._network = network
 
     def record_train(self, t_xs, t_ys, global_step, *args):
         if self._network.reg == 'dropout':

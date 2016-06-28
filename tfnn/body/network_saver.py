@@ -7,11 +7,10 @@ class NetworkSaver(object):
     """
     Save, rebuild and restore network.
     """
-    def save(self, network, data, path='/tmp/'):
+    def save(self, network, path='/tmp/'):
         """
         save network config and normalized data config
         :param network: trained network
-        :param data: normalized data
         :param path: save to path
         """
         saver = tfnn.train.Saver()
@@ -27,7 +26,7 @@ class NetworkSaver(object):
                           'n_inputs': network.n_inputs,
                           'n_outputs': network.n_outputs,
                           'layers': [network.record_neurons, network.record_activators],
-                          'data_config': data.config}
+                          'data_config': network.normalizer.config}
         with open(config_path+'network_config.pickle', 'wb') as file:
             pickle.dump(network_config, file)
         print("Model saved in file: %s" % save_path)
@@ -42,12 +41,12 @@ class NetworkSaver(object):
         n_outputs = network_config['n_outputs']  # network.n_outputs,
         layers_neurons = network_config['layers'][0]  # [network.record_neurons,
         layers_activators = network_config['layers'][1]  # network.record_activators],
-        data_config = network_config['data_config']  # data.config
-        input_filter = tfnn.NormalizeFilter(data_config)
+        data_config = network_config['data_config']  # network.normalizer.config
         if name == 'RegressionNetwork':
             network = tfnn.RegressionNetwork(n_inputs, n_outputs)
         else:
             network = tfnn.ClassificationNetwork(n_inputs, n_outputs)
+        network.normalizer.set_config(data_config)
         for i in range(len(layers_neurons)):
             layer_activator = layers_activators[i]
             if layer_activator is None:
@@ -75,4 +74,4 @@ class NetworkSaver(object):
         self._network.sess.run(self._network._init)
         saver.restore(self._network.sess, os.getcwd() + path + '/variables/network.ckpt')
         print('Model restored.')
-        return [self._network, input_filter]
+        return self._network

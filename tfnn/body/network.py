@@ -1,11 +1,13 @@
 import pandas as pd
 import numpy as np
 import tfnn
+from tfnn.datasets.normalizer import Normalizer
 
 
 class Network(object):
     def __init__(self, n_inputs, n_outputs, input_dtype, output_dtype, output_activator,
                  do_dropout, do_l2, seed=None):
+        self.normalizer = Normalizer()
         self.n_inputs = n_inputs
         self.n_outputs = n_outputs
         self.input_dtype = input_dtype
@@ -60,10 +62,10 @@ class Network(object):
         with tfnn.name_scope(layer_name):
             with tfnn.name_scope('weights'):
                 W = self._weight_variable([self.last_layer_neurons, n_neurons])
-                self._variable_summaries(W, layer_name+'/weights')
+                tfnn.histogram_summary(layer_name+'/weights', W)
             with tfnn.name_scope('biases'):
                 b = self._bias_variable([n_neurons, ])
-                self._variable_summaries(b, layer_name + '/biases')
+                tfnn.histogram_summary(layer_name + '/biases', b)
             with tfnn.name_scope('Wx_plus_b'):
                 product = tfnn.add(tfnn.matmul(self.last_layer_outputs, W, name='Wx'), b, name='Wx_plus_b')
             if activator is None:
@@ -174,6 +176,10 @@ class Network(object):
             predictions = predictions[0][0]
         return predictions
 
+    def save(self, path='/tmp/'):
+        saver = tfnn.NetworkSaver()
+        saver.save(self, path)
+
     def _weight_variable(self, shape):
         initial = tfnn.random_normal(
             shape, mean=0.0, stddev=0.2, dtype=self.input_dtype, seed=self.seed, name='weights')
@@ -182,18 +188,6 @@ class Network(object):
     def _bias_variable(self, shape):
         initial = tfnn.constant(0.1, shape=shape, dtype=self.input_dtype, name='biases')
         return tfnn.Variable(initial)
-
-    @staticmethod
-    def _variable_summaries(var, name):
-        with tfnn.name_scope("summaries"):
-            mean = tfnn.reduce_mean(var)
-            tfnn.scalar_summary('mean/' + name, mean)
-            with tfnn.name_scope('stddev'):
-                stddev = tfnn.sqrt(tfnn.reduce_sum(tfnn.square(var - mean)))
-            tfnn.scalar_summary('sttdev/' + name, stddev)
-            tfnn.scalar_summary('max/' + name, tfnn.reduce_max(var))
-            tfnn.scalar_summary('min/' + name, tfnn.reduce_min(var))
-            tfnn.histogram_summary(name, var)
 
     def _init_loss(self):
         self.loss = None

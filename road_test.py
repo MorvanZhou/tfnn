@@ -11,10 +11,10 @@ def train(data_path):
     print('sample size:', pd.read_pickle(data_path).shape[0])
     ys = load_data.a
     data = tfnn.Data(xs, ys, name='road_data')
-    data.minmax_normalize(inplace=True)
-    t_data, v_data = data.train_test_split(0.7)
 
     network = tfnn.RegressionNetwork(xs.shape[1], 1, do_dropout=False)
+    n_data = network.normalizer.minmax_fit(data)
+    t_data, v_data = n_data.train_test_split(0.7)
     network.add_hidden_layer(100, activator=tfnn.nn.relu, dropout_layer=True)
     network.add_output_layer(activator=None, dropout_layer=False)
     global_step = tfnn.Variable(0, trainable=False)
@@ -22,7 +22,7 @@ def train(data_path):
     optimizer = tfnn.train.AdamOptimizer(0.001)
     network.set_optimizer(optimizer, global_step)
     evaluator = tfnn.Evaluator(network)
-    summarizer = tfnn.Summarizer(save_path='/tmp/log', network=network)
+    summarizer = tfnn.Summarizer(network, save_path='/tmp/log')
 
     for i in range(10000):
         b_xs, b_ys = t_data.next_batch(100, loop=True)
@@ -31,12 +31,10 @@ def train(data_path):
             print(evaluator.compute_cost(v_data.xs, v_data.ys))
             summarizer.record_train(b_xs, b_ys, i, 0.5)
             summarizer.record_validate(v_data.xs, v_data.ys, i)
-    network_saver = tfnn.NetworkSaver()
-    network_saver.save(network, data)
+    network.save()
+    evaluator.regression_plot_linear_comparison(v_data.xs, v_data.ys, continue_plot=True)
     network.sess.close()
-    evaluator.plot_single_output_comparison(v_data.xs, v_data.ys, continue_plot=True)
     summarizer.web_visualize()
-
 
 
 def compare_real(data_path):
@@ -46,8 +44,8 @@ def compare_real(data_path):
     ys = load_data.a[s:f]
     network_saver = tfnn.NetworkSaver()
     restore_path = '/tmp/'
-    network, input_filter = network_saver.restore(restore_path)
-    prediction = network.predict(input_filter.filter(xs))
+    network = network_saver.restore(restore_path)
+    prediction = network.predict(network.normalizer.fit_transform(xs))
     plt.plot(np.arange(xs.shape[0]), prediction, 'r--', label='predicted')
     plt.plot(np.arange(xs.shape[0]), ys, 'k-', label='real')
     plt.legend(loc='best')
@@ -66,7 +64,7 @@ class Car:
 def test():
     network_saver = tfnn.NetworkSaver()
     restore_path = '/tmp/'
-    network, input_filter = network_saver.restore(restore_path)
+    network = network_saver.restore(restore_path)
     test_time = 60
     cars = []
     for i in range(8):
@@ -109,7 +107,7 @@ def test():
                     vs_data = cars[j].vs[-10:]
                     vs_l_data = cars[j-1].vs[-10:]
                     xs_data = np.array(ss_data+vs_data+vs_l_data)
-                    a = network.predict(input_filter.filter(xs_data))
+                    a = network.predict(network.normalizer.fit_transform(xs_data))
 
                 cars[j].ps.append(cars[j].ps[-1] + cars[j].vs[-1] * 0.1 + 1 / 2 * cars[j].acs[-1] * 0.1 ** 2)
                 v = cars[j].vs[-1] + 0.1 * a
@@ -159,7 +157,7 @@ def test():
 
 
 if __name__ == '__main__':
-    path = r'road data/train_I80_lane_1_1s.pickle'
-    # train(path)
-    # compare_real(path)
-    test()
+    path = r'road data/train_I80_lane1_1s.pickle'
+    train(path)
+    compare_real(path)
+    # test()
