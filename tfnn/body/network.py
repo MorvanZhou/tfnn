@@ -109,7 +109,7 @@ class Network(object):
 
     def set_optimizer(self, optimizer=None, global_step=None,):
         if optimizer is None:
-            optimizer = tfnn.train.GradientDescentOptimizer(0.001)
+            optimizer = tfnn.train.GradientDescentOptimizer(0.01)
         if not self.has_output_layer:
             raise NotImplementedError('Please add output layer.')
         with tfnn.name_scope('trian'):

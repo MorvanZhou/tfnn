@@ -6,5 +6,8 @@ Requirements.
 1. tensorflow
 2. numpy
 3. pandas
+4. matplotlib
 
-Easy to add neural network layers and evaluate preformance.
+Easy to construct neural network and evaluate performance.
+
+Please run the simple_usage_demo.py to see the basic usage of tfnn.
