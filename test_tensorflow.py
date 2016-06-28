@@ -1,6 +1,7 @@
 import time
 from sklearn.datasets import fetch_olivetti_faces
 from sklearn.datasets import load_boston
+from sklearn.linear_model import SGDClassifier
 from tensorflow.examples.tutorials.mnist import input_data
 import tfnn
 import numpy as np

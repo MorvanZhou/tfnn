@@ -140,6 +140,20 @@ class Network(object):
             self.sess.run(self.train_op, feed_dict={self.data_placeholder: feed_xs,
                                                     self.target_placeholder: feed_ys})
 
+    def fit(self, feed_xs, feed_ys, n_iter=5000, *args):
+        """
+        Fit data to network, automatically training the network.
+        :param feed_xs:
+        :param feed_ys:
+        :param n_iter: when n_iter=-1, the training steps= n_samples*2
+        :param args: pass keep_prob when use dropout, pass l2_lambda when use l2 regularization.
+        :return: Nothing
+        """
+        train_data = tfnn.Data(feed_xs, feed_ys)
+        for _ in range(n_iter):
+            b_xs, b_ys = train_data.next_batch(100, loop=True)
+            self.run_step(feed_xs=b_xs, feed_ys=b_ys, *args)
+
     def get_loss(self, xs, ys):
         if self.reg == 'dropout':
             _loss_value = self.sess.run(self.loss, feed_dict={self.data_placeholder: xs,
