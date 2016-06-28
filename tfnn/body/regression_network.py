@@ -2,11 +2,11 @@ from tfnn.body.network import Network
 import tfnn
 
 
-class RegressionNetwork(Network):
+class RegNetwork(Network):
     def __init__(self, n_inputs, n_outputs, intput_dtype=tfnn.float32, output_dtype=tfnn.float32,
                  do_dropout=False, do_l2=False, seed=None):
         output_activator = None
-        super(RegressionNetwork, self).__init__(
+        super(RegNetwork, self).__init__(
             n_inputs, n_outputs, intput_dtype, output_dtype, output_activator,
             do_dropout, do_l2, seed)
         self.name = 'RegressionNetwork'

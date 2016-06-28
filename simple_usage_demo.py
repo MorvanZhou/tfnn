@@ -5,7 +5,7 @@ import tfnn
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
 # define network properties
-network = tfnn.ClassificationNetwork(n_inputs=mnist.train.images.shape[1], n_outputs=mnist.train.labels.shape[1])
+network = tfnn.ClfNetwork(n_inputs=mnist.train.images.shape[1], n_outputs=mnist.train.labels.shape[1])
 
 # add hidden layer
 network.add_hidden_layer(n_neurons=20, activator=tfnn.nn.relu)
