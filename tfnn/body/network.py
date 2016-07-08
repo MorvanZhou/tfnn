@@ -32,6 +32,7 @@ class Network(object):
             if do_l2:
                 self.l2_placeholder = tfnn.placeholder(tfnn.float32)
                 tfnn.scalar_summary('l2_lambda', self.l2_placeholder)
+        self.layers_type = pd.Series([])
         self.layers_output = pd.Series([])
         self.layers_activated_output = pd.Series([])
         self.layers_dropped_output = pd.Series([])
@@ -42,7 +43,7 @@ class Network(object):
         self.record_neurons = []
         self.last_layer_neurons = n_inputs
         self.last_layer_outputs = self.data_placeholder
-        self.hidden_layer_number = 1
+        self.layer_number = 1
         self.has_output_layer = False
         self._is_output_layer = False
 
@@ -56,7 +57,7 @@ class Network(object):
         :return:
         """
         if not self._is_output_layer:
-            layer_name = 'hidden_layer%i' % self.hidden_layer_number
+            layer_name = 'hidden_layer%i' % self.layer_number
         else:
             layer_name = 'output_layer'
         with tfnn.name_scope(layer_name):
@@ -83,7 +84,8 @@ class Network(object):
             else:
                 final_product = activated_product
 
-        self.hidden_layer_number += 1
+        self.layers_type.set_value(len(self.layers_type), "func")
+        self.layer_number += 1
         self.last_layer_outputs = final_product
         self.Ws.set_value(label=len(self.Ws), value=W)
         self.bs.set_value(label=len(self.bs), value=b)
@@ -95,6 +97,54 @@ class Network(object):
 
         self.layers_output.set_value(label=len(self.layers_output),
                                      value=product)
+        self.layers_activated_output.set_value(label=len(self.layers_output),
+                                               value=activated_product)
+        self.layers_final_output.set_value(label=len(self.layers_final_output),
+                                           value=final_product)
+        self.last_layer_neurons = n_neurons
+
+    def add_func_layer(self, n_neurons, activator=None, dropout_layer=False):
+        self.add_hidden_layer(n_neurons, activator, dropout_layer)
+
+    def add_conv_layer(self, patch_x, patch_y, n_neurons, activator=None, dropout_layer=False):
+        def conv2d(x, W):
+            # stride [1, x_movement, y_movement, 1]
+            # Must have strides[0] = strides[3] = 1
+            return tfnn.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
+
+        def max_pool_2x2(x):
+            # stride [1, x_movement, y_movement, 1]
+            return tfnn.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+
+        W_conv = self._weight_variable([patch_x, patch_y, self.last_layer_neurons, n_neurons])  # patch 5x5, in size 1, out size 32
+        b_conv = self._bias_variable([n_neurons, ])
+        if activator is not None:
+            activated_product = activator(conv2d(self.last_layer_outputs, W_conv) + b_conv)  # output size 28x28x32
+        else:
+            activated_product = conv2d(self.last_layer_outputs, W_conv) + b_conv
+        pooled_product = max_pool_2x2(activated_product)
+        if (self.reg == 'dropout') and dropout_layer:
+            dropped_product = tfnn.nn.dropout(pooled_product,
+                                              self.keep_prob_placeholder,
+                                              seed=self.seed, name='dropout')
+            self.layers_dropped_output.set_value(label=len(self.layers_dropped_output),
+                                                 value=dropped_product)
+            final_product = dropped_product
+        else:
+            final_product = activated_product
+        self.layers_type.set_value(len(self.layers_type), "conv")
+        self.last_layer_outputs = final_product
+        self.layer_number += 1
+        self.Ws.set_value(label=len(self.Ws), value=W_conv)
+        self.bs.set_value(label=len(self.bs), value=b_conv)
+        if activator is None:
+            self.record_activators.set_value(label=len(self.record_activators), value=None)
+        else:
+            self.record_activators.set_value(label=len(self.record_activators), value=activator(0).name)
+        self.record_neurons.append(n_neurons)
+        self.layers_output.set_value(label=len(self.layers_output),
+                                     value=pooled_product)
+
         self.layers_activated_output.set_value(label=len(self.layers_output),
                                                value=activated_product)
         self.layers_final_output.set_value(label=len(self.layers_final_output),
