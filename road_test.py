@@ -12,7 +12,7 @@ def train(data_path):
     ys = load_data.a
     data = tfnn.Data(xs, ys, name='road_data')
 
-    network = tfnn.RegressionNetwork(xs.shape[1], 1, do_dropout=False)
+    network = tfnn.RegNetwork(xs.shape[1], 1, do_dropout=False)
     n_data = network.normalizer.minmax_fit(data)
     t_data, v_data = n_data.train_test_split(0.7)
     network.add_hidden_layer(100, activator=tfnn.nn.relu, dropout_layer=True)

@@ -6,7 +6,7 @@ plt.style.use('ggplot')
 class Evaluator(object):
     def __init__(self, network, ):
         self.network = network
-        if isinstance(self.network, tfnn.ClassificationNetwork):
+        if isinstance(self.network, tfnn.ClfNetwork):
             with tfnn.name_scope('accuracy'):
                 with tfnn.name_scope('correct_prediction'):
                     correct_prediction = tfnn.equal(tfnn.argmax(network.predictions, 1),
@@ -14,7 +14,7 @@ class Evaluator(object):
                 with tfnn.name_scope('accuracy'):
                     self.accuracy = tfnn.reduce_mean(tfnn.cast(correct_prediction, tfnn.float32), name='accuracy')
                 tfnn.scalar_summary('accuracy', self.accuracy)
-        elif isinstance(self.network, tfnn.RegressionNetwork):
+        elif isinstance(self.network, tfnn.RegNetwork):
             self.first_time_lm = True
             self.first_time_soc = True
         with tfnn.name_scope('r2_score'):
@@ -47,7 +47,7 @@ class Evaluator(object):
         return self.r2_score.eval(feed_dict, self.network.sess)
 
     def compute_accuracy(self, xs, ys):
-        if not isinstance(self.network, tfnn.ClassificationNetwork):
+        if not isinstance(self.network, tfnn.ClfNetwork):
             raise NotImplementedError('Can only compute accuracy for Classification neural network.')
 
         if self.network.reg == 'dropout':
@@ -86,7 +86,7 @@ class Evaluator(object):
         :param continue_plot: True or False
         :return: Plotting
         """
-        if not isinstance(self.network, tfnn.RegressionNetwork):
+        if not isinstance(self.network, tfnn.RegNetwork):
             raise NotImplementedError('Can only plot for Regression neural network.')
         elif v_ys.shape[1] > 1:
             raise NotImplementedError('Can only support ys which have single value.')
@@ -129,7 +129,7 @@ class Evaluator(object):
         :param continue_plot: True or False
         :return: plotting
         """
-        if not isinstance(self.network, tfnn.RegressionNetwork):
+        if not isinstance(self.network, tfnn.RegNetwork):
             raise NotImplementedError('Can only plot this result for Regression neural network.')
         elif v_ys.shape[1] > 1:
             raise NotImplementedError('Can only support ys which have single value.')

@@ -2,7 +2,7 @@ from tfnn.body.network import Network
 import tfnn
 
 
-class ClassificationNetwork(Network):
+class ClfNetwork(Network):
     def __init__(self, n_inputs, n_outputs, method='softmax', do_dropout=False, do_l2=False, seed=None):
         if method == 'softmax':
             input_dtype = tfnn.float32
@@ -14,7 +14,7 @@ class ClassificationNetwork(Network):
             output_activator = tfnn.sigmoid
         else:
             raise ValueError("method should be one of ['softmax', 'sigmoid']")
-        super(ClassificationNetwork, self).__init__(
+        super(ClfNetwork, self).__init__(
             n_inputs, n_outputs, input_dtype, output_dtype, output_activator,
             do_dropout, do_l2, seed)
         self.method = method

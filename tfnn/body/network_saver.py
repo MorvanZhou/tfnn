@@ -43,9 +43,9 @@ class NetworkSaver(object):
         layers_activators = network_config['layers'][1]  # network.record_activators],
         data_config = network_config['data_config']  # network.normalizer.config
         if name == 'RegressionNetwork':
-            network = tfnn.RegressionNetwork(n_inputs, n_outputs)
+            network = tfnn.RegNetwork(n_inputs, n_outputs)
         else:
-            network = tfnn.ClassificationNetwork(n_inputs, n_outputs)
+            network = tfnn.ClfNetwork(n_inputs, n_outputs)
         network.normalizer.set_config(data_config)
         for i in range(len(layers_neurons)):
             layer_activator = layers_activators[i]

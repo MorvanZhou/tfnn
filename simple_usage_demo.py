@@ -5,7 +5,7 @@ import tfnn
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
 # define network properties
-network = tfnn.ClassificationNetwork(n_inputs=mnist.train.images.shape[1], n_outputs=mnist.train.labels.shape[1])
+network = tfnn.ClfNetwork(n_inputs=mnist.train.images.shape[1], n_outputs=mnist.train.labels.shape[1])
 
 # add hidden layer
 network.add_hidden_layer(n_neurons=20, activator=tfnn.nn.relu)
@@ -19,13 +19,10 @@ network.set_optimizer()
 # set evaluator for compute the accuracy, loss etc.
 evaluator = tfnn.Evaluator(network)
 
-for i in range(3000):
-    # batch data
-    batch_xs, batch_ys = mnist.train.next_batch(100)
+# similar to sklearn, we have fit function
+network.fit(mnist.train.images, mnist.train.labels)
 
-    # learning from batch data
-    network.run_step(feed_xs=batch_xs, feed_ys=batch_ys)
+# use evaluator to compute accuracy and loss
+print(evaluator.compute_accuracy(xs=mnist.test.images, ys=mnist.test.labels))
 
-    if i % 50 == 0:
-        # print predict accuracy
-        print(evaluator.compute_accuracy(xs=mnist.test.images, ys=mnist.test.labels))
+
