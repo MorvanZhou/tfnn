@@ -9,6 +9,7 @@ def shuffle(data, inplace=False):
     ys = xs_ys[:, n_x:]
     if inplace:
         data.xs, data.ys = xs, ys
+        return None
     else:
         shuffled_data = data.copy()
         shuffled_data.xs, shuffled_data.ys = xs, ys

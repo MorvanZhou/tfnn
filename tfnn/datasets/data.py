@@ -3,7 +3,7 @@ import copy
 
 from tfnn.datasets.shuffle import shuffle as data_sets_shuffle
 from tfnn.datasets.train_test_split import train_test_split as data_sets_train_test_split
-from tfnn.datasets.to_binary import to_binary as data_sets_to_binary
+from tfnn.datasets.to_binary import BinaryEncoder
 from tfnn.datasets.sampled_batch import sampled_batch as data_sets_sampled_batch
 
 
@@ -37,16 +37,33 @@ class Data:
         self.name = name
 
     def shuffle(self, inplace=False):
-        if inplace:
-            data_sets_shuffle(self, inplace)
-        else:
-            return data_sets_shuffle(self, inplace)
+        result = data_sets_shuffle(self, inplace)
+        if result is not None:
+            return result
 
-    def to_binary(self, inplace=False):
-        if inplace:
-            data_sets_to_binary(self, inplace)
-        else:
-            return data_sets_to_binary(self, inplace)
+    def encode_cat_y(self, columns=None, inplace=False):
+        """
+        1-of-C dummy-coding the categorical target data.
+        :param inplace: True of False
+        :return:
+        """
+        encoder = BinaryEncoder()
+        result = encoder.encode_target(self, columns, inplace)
+        if result is not None:
+            return result
+
+    def encode_cat_x(self, columns=None, inplace=False):
+        """
+        1-of-(C-1) effects-coding the categorical feature data.
+        :features_name: If None, encode all features. Otherwise features_name should be given as an list,
+        eg. ['featrue1','feature2'].
+        :param inplace: True or False
+        :return:
+        """
+        encoder = BinaryEncoder()
+        result = encoder.encode_data(self, columns, inplace)
+        if result is not None:
+            return result
 
     def sampled_batch(self, batch_size):
         return data_sets_sampled_batch(self, batch_size)
