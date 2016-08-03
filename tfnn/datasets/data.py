@@ -1,10 +1,13 @@
 import numpy as np
+import pandas as pd
 import copy
 
 from tfnn.datasets.shuffle import shuffle as data_sets_shuffle
 from tfnn.datasets.train_test_split import train_test_split as data_sets_train_test_split
 from tfnn.datasets.to_binary import BinaryEncoder
 from tfnn.datasets.sampled_batch import sampled_batch as data_sets_sampled_batch
+from tfnn.datasets.plot_feature_utility import plot_feature_utility as data_sets_plot_feature_utility
+from tfnn.datasets.next_batch import next_batch as data_sets_next_batch
 
 
 class Data:
@@ -14,25 +17,19 @@ class Data:
         :param xs: data, shape(n_xs, n_samples), (pd.DataFrame)
         :param ys: labels, shape(n_ys, n_samples), (pd.DataFrame)
         """
-
-        if 'pandas' in type(xs).__module__:
-            xs = xs.as_matrix()
-        if 'pandas' in type(ys).__module__:
-            ys = ys.as_matrix()
-
-        if xs.ndim == 1:
-            xs = xs[:, np.newaxis]
-        if ys.ndim == 1:
-            ys = ys[:, np.newaxis]
-        xs_type, ys_type = type(xs).__module__, type(ys).__module__
-        if xs_type == np.__name__:
-            if ys_type == np.__name__:
-                self.xs = xs.copy()  # shape (n_xs, n_samples)
-                self.ys = ys.copy()  # shape (n_ys, n_samples)
-            else:
-                raise ValueError('Data have to be numpy or pandas.core.frame')
+        if ('numpy' in type(xs).__module__) & ('numpy' in type(ys).__module__):
+            xs = pd.DataFrame(xs)
+            ys = pd.DataFrame(ys)
+        elif ('pandas' in type(xs).__module__) & ('pandas' in type(ys).__module__):
+            self.module = 'pandas'
         else:
-            raise ValueError('Data have to be numpy or pandas.core.frame')
+            raise TypeError('data type must be numpy or pandas')
+        if type(xs) is pd.core.series.Series:
+            xs = xs.to_frame()
+        if type(ys) is pd.core.series.Series:
+            ys = ys.to_frame()
+        self.xs = xs.copy()  # shape (n_xs, n_samples)
+        self.ys = ys.copy()  # shape (n_ys, n_samples)
         self.n_samples = ys.shape[0]
         self.name = name
 
@@ -65,31 +62,27 @@ class Data:
         if result is not None:
             return result
 
-    def sampled_batch(self, batch_size):
-        return data_sets_sampled_batch(self, batch_size)
+    def sampled_batch(self, batch_size, replace=False, random_state=None):
+        """
+
+        :param batch_size:
+        :param replace: Allow replacements in sampled data
+        :param random_state:
+        :return:
+        """
+        return data_sets_sampled_batch(self, batch_size, replace, random_state)
 
     def next_batch(self, batch_size, loop=False):
-        try:
-            self._batch_index_segments
-        except AttributeError:
-            self._n_segments = self.n_samples//batch_size
-            self._batch_index_segments = np.array_split(np.arange(self.n_samples), self._n_segments)
-            self._batch_counter = 0
-        if loop:
-            self._batch_counter += 1
-            _mini_batch_indexes = self._batch_index_segments[self._batch_counter - 1]
-            batch_xs = self.xs[_mini_batch_indexes, :]
-            batch_ys = self.ys[_mini_batch_indexes, :]
-            if self._batch_counter == self._n_segments:
-                self._batch_counter = 0
-        else:
-            self._batch_counter += 1
-            _mini_batch_indexes = self._batch_index_segments[self._batch_counter - 1]
-            batch_xs = self.xs[_mini_batch_indexes, :]
-            batch_ys = self.ys[_mini_batch_indexes, :]
-            if self._batch_counter == self._n_segments:
-                raise IndexError('No more training data. Either set loop=True or reduce training steps.')
-        return [batch_xs, batch_ys]
+        return data_sets_next_batch(self, batch_size, loop)
+
+    def plot_feature_utility(self, selected_feature_name, target_name=None):
+        """
+        This function is to check the categorical feature utility for machine learning BEFORE BINARIZE.
+        :param selected_feature_name:
+        :param target_name:
+        :return:
+        """
+        data_sets_plot_feature_utility(self, selected_feature_name, target_name)
 
     def train_test_split(self, train_rate=0.7, randomly=True):
         t_data, v_data = data_sets_train_test_split(self, train_rate, randomly)
@@ -97,3 +90,16 @@ class Data:
 
     def copy(self):
         return copy.deepcopy(self)
+
+
+if __name__ == "__main__":
+    xs = pd.DataFrame({'a': ['a','d','f','f','a'],
+                       'b': [1,2,3,4,5],
+                       'c': ['f','m','m','f','f']})
+    ys = pd.DataFrame({'answer': ['y','n','y','y','n']})
+    # xs = np.arange(12).reshape((4,3))
+    # ys = np.array(['y','n','y', 'y'])
+    data = Data(xs, ys)
+    train, test = data.train_test_split()
+    print(test.xs)
+    print(test.ys)

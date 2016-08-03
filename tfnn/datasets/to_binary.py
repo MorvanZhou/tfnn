@@ -29,7 +29,7 @@ class BinaryEncoder(object):
         :param inplace:
         :return:
         """
-        result = pd.get_dummies(data.ys, columns=columns, drop_first=True)  # drop_first exist in pandas >= 0.18.1 only
+        result = pd.get_dummies(data.xs, columns=columns, drop_first=True)  # drop_first exist in pandas >= 0.18.1 only
         # to be done: convert C-1 all 0 data to all -1
         if inplace:
             data.ys = result
