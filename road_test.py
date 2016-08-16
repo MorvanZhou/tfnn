@@ -5,11 +5,14 @@ import matplotlib.pyplot as plt
 
 
 def train(data_path):
-    load_data = pd.read_pickle(data_path).iloc[:10000, :]
-    xs = load_data.iloc[:, 1:]
-    print(xs.head(2))
-    print('sample size:', pd.read_pickle(data_path).shape[0])
-    ys = load_data.a
+    # load_data = pd.read_pickle(data_path).iloc[:10000, :]
+    # xs = load_data.iloc[:, -60:]
+    load_data = pd.read_csv(path, index_col=0).dropna()
+    xs = pd.concat([load_data.iloc[:, -70:-60], load_data.iloc[:, -50: -40], load_data.iloc[:, -30:-20]], axis=1)
+    print(xs.shape, xs.head(2))
+    print('sample size:', load_data.shape[0])
+    # ys = load_data.a
+    ys = load_data.deri_a_clipped
     data = tfnn.Data(xs, ys, name='road_data')
 
     network = tfnn.RegNetwork(xs.shape[1], 1, do_dropout=False)
@@ -19,7 +22,7 @@ def train(data_path):
     network.add_output_layer(activator=None, dropout_layer=False)
     global_step = tfnn.Variable(0, trainable=False)
     # lr = tfnn.train.exponential_decay(0.001, global_step, 2000, 0.9)
-    optimizer = tfnn.train.AdamOptimizer(0.001)
+    optimizer = tfnn.train.AdamOptimizer(0.005)
     network.set_optimizer(optimizer, global_step)
     evaluator = tfnn.Evaluator(network)
     summarizer = tfnn.Summarizer(network, save_path='/tmp/log')
@@ -32,16 +35,20 @@ def train(data_path):
             summarizer.record_train(b_xs, b_ys, i, 0.5)
             summarizer.record_validate(v_data.xs, v_data.ys, i)
     network.save()
-    evaluator.regression_plot_linear_comparison(v_data.xs, v_data.ys, continue_plot=True)
+    evaluator.regression_plot_linear_comparison(v_data.xs, v_data.ys, continue_plot=False)
     network.sess.close()
     summarizer.web_visualize()
 
 
 def compare_real(data_path):
-    load_data = pd.read_pickle(data_path)
-    s, f = 10700, 10900
-    xs = load_data.iloc[s:f, 1:]
-    ys = load_data.a[s:f]
+    # load_data = pd.read_pickle(data_path)
+    load_data = pd.read_csv(path, index_col=0).dropna()
+    s = 2700
+    f = s + 300
+    # xs = load_data.iloc[s:f, -60:]
+    xs = pd.concat([load_data.iloc[s:f, -70:-60], load_data.iloc[s:f, -50: -40], load_data.iloc[s:f, -30:-20]], axis=1)
+    ys = load_data.deri_a_clipped[s:f]
+    # ys = load_data.a[s:f]
     network_saver = tfnn.NetworkSaver()
     restore_path = '/tmp/'
     network = network_saver.restore(restore_path)
@@ -157,7 +164,8 @@ def test():
 
 
 if __name__ == '__main__':
-    path = r'road data/train_I80_lane1_1s.pickle'
-    train(path)
+    path = r's3.csv'
+    # path = r'/Users/MorvanZhou/Documents/python/2016_05_21_tfnn/road data/train_I80_lane_1_1s.pickle'
+    # train(path)
     compare_real(path)
     # test()

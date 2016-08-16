@@ -51,15 +51,15 @@ class NetworkSaver(object):
             layer_activator = layers_activators[i]
             if layer_activator is None:
                 activator = None
-            elif 'Relu:' in layer_activator:
-                activator = tfnn.nn.relu
-            elif 'Relu6:' in layer_activator:
+            elif 'Relu6' in layer_activator:
                 activator = tfnn.nn.relu6
-            elif 'Softplus:' in layer_activator:
+            elif 'Relu' in layer_activator:
+                activator = tfnn.nn.relu
+            elif 'Softplus' in layer_activator:
                 activator = tfnn.nn.softplus
-            elif 'Sigmoid:' in layer_activator:
+            elif 'Sigmoid' in layer_activator:
                 activator = tfnn.sigmoid
-            elif 'Tanh:' in layer_activator:
+            elif 'Tanh' in layer_activator:
                 activator = tfnn.tanh
             else:
                 raise ValueError('No activator as %s.' % layer_activator)
