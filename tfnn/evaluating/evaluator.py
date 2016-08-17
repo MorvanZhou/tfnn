@@ -111,6 +111,7 @@ class Evaluator(object):
             self.ax_soc.grid(True)
             self.ax_soc.legend()
             self.ax_soc.set_xlabel('Real data')
+            self.ax_soc.set_ylim([v_ys.min()[0]*1.2, v_ys.max()[0]*1.2])
             self.ax_soc.set_ylabel('Predicted')
             if continue_plot:
                 plt.ion()

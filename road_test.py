@@ -9,7 +9,10 @@ def train(data_path):
     # xs = load_data.iloc[:, -60:]
     load_data = pd.read_pickle(data_path).dropna()
     # load_data = pd.read_csv(data_path, index_col=0).dropna()
-    xs = pd.concat([load_data.iloc[:, -70:-60], load_data.iloc[:, -50: -40], load_data.iloc[:, -30:-20]], axis=1)
+    duration = 0.2    # second
+    xs = pd.concat([load_data.iloc[:, -60-int(duration*10):-60],
+                    load_data.iloc[:, -40-int(duration*10):-40],
+                    load_data.iloc[:, -20-int(duration*10):-20]], axis=1)
     print(xs.shape, xs.head(2))
     print('sample size:', load_data.shape[0])
     # ys = load_data.a
@@ -19,8 +22,9 @@ def train(data_path):
     network = tfnn.RegNetwork(xs.shape[1], 1, do_dropout=False)
     n_data = network.normalizer.minmax_fit(data)
     t_data, v_data = n_data.train_test_split(0.7)
-    network.add_hidden_layer(80, activator=tfnn.nn.relu, dropout_layer=True)
-    network.add_hidden_layer(80, activator=tfnn.nn.relu, dropout_layer=True)
+    # the number of hidden unit is 2 * xs features
+    network.add_hidden_layer(xs.shape[1]*2, activator=tfnn.nn.relu, dropout_layer=True)
+    # network.add_hidden_layer(100, activator=tfnn.nn.relu, dropout_layer=True)
     network.add_output_layer(activator=None, dropout_layer=False)
     global_step = tfnn.Variable(0, trainable=False)
     # lr = tfnn.train.exponential_decay(0.001, global_step, 2000, 0.9)
@@ -29,27 +33,30 @@ def train(data_path):
     evaluator = tfnn.Evaluator(network)
     summarizer = tfnn.Summarizer(network, save_path='/tmp/log')
 
-    for i in range(20000):
+    for i in range(40000):
         b_xs, b_ys = t_data.next_batch(100, loop=True)
         network.run_step(b_xs, b_ys, 0.5)
         if i % 1000 == 0:
             print(evaluator.compute_cost(v_data.xs, v_data.ys))
             summarizer.record_train(b_xs, b_ys, i, 0.5)
             summarizer.record_validate(v_data.xs, v_data.ys, i)
+            evaluator.regression_plot_linear_comparison(v_data.xs, v_data.ys, continue_plot=True)
     network.save()
-    # evaluator.regression_plot_linear_comparison(v_data.xs, v_data.ys, continue_plot=False)
     network.sess.close()
     summarizer.web_visualize()
 
 
-def compare_real(data_path):
+def compare_real(path):
     # load_data = pd.read_pickle(data_path)
     load_data = pd.read_pickle(path).dropna().iloc[-10000:, :]
     # load_data = pd.read_csv(path, index_col=0).dropna()
-    s = 3400
+    s = 3300
     f = s + 300
     # xs = load_data.iloc[s:f, -60:]
-    xs = pd.concat([load_data.iloc[s:f, -70:-60], load_data.iloc[s:f, -50: -40], load_data.iloc[s:f, -30:-20]], axis=1)
+    duration = 0.2
+    xs = pd.concat([load_data.iloc[s:f, -60 - int(duration*10):-60],
+                    load_data.iloc[s:f, -40 - int(duration*10):-40],
+                    load_data.iloc[s:f, -20 - int(duration*10):-20]], axis=1)
     ys = load_data.deri_a_clipped[s:f]
     # ys = load_data.a[s:f]
     network_saver = tfnn.NetworkSaver()
@@ -166,9 +173,87 @@ def test():
     plt.show()
 
 
+def cross_validation(path):
+    seconds_range = [0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0, 1.5, 2.0]
+    # learning_rates = .1 ** np.arange(1, 6, dtype=np.float32)
+    cross_duration_cost = pd.DataFrame()
+    cross_duration_r2 = pd.DataFrame()
+    for duration in seconds_range:
+        tfnn.set_random_seed(111)
+        np.random.seed(111)
+        load_data = pd.read_pickle(path).dropna()
+
+        # data include v, v_leader, dx
+        xs = pd.concat([load_data.iloc[:, -60 - int(duration * 10):-60],
+                        load_data.iloc[:, -40 - int(duration * 10):-40],
+                        load_data.iloc[:, -20 - int(duration * 10):-20]], axis=1)
+        ys = load_data.deri_a_clipped
+        data = tfnn.Data(xs, ys, name='road_data')
+
+        network = tfnn.RegNetwork(xs.shape[1], 1, do_dropout=False)
+        n_data = network.normalizer.minmax_fit(data)
+        t_data, v_data = n_data.train_test_split(0.7)
+
+        # the number of hidden unit is 2 * xs features
+        network.add_hidden_layer(xs.shape[1] * 2, activator=tfnn.nn.relu, dropout_layer=True)
+        network.add_output_layer(activator=None, dropout_layer=False)
+        global_step = tfnn.Variable(0, trainable=False)
+        # done a cross validation about learning rate, the best lr is 0.001
+        optimizer = tfnn.train.AdamOptimizer(0.001)
+        network.set_optimizer(optimizer, global_step)
+        evaluator = tfnn.Evaluator(network)
+        duration_cost = pd.Series(name='%s s' % duration)
+        duration_r2 = pd.Series(name='%s s' % duration)
+
+        # duration_cost = pd.Series(name='Test')  #
+        # duration_r2 = pd.Series(name='Test')  #
+        # train_cost = pd.Series(name='Train')  #
+        # train_r2 = pd.Series(name='Train')  #
+        for i in range(40000):
+            b_xs, b_ys = t_data.next_batch(100, loop=True)
+            network.run_step(b_xs, b_ys, 0.5)
+            if i % 200 == 0:
+                cost = evaluator.compute_cost(v_data.xs, v_data.ys)
+                r2 = evaluator.compute_r2_score(v_data.xs, v_data.ys)
+
+                # cost_train = evaluator.compute_cost(t_data.xs, t_data.ys)  #
+                # r2_train = evaluator.compute_r2_score(t_data.xs, t_data.ys)  #
+                duration_cost.set_value(i, cost)
+                duration_r2.set_value(i, r2)
+
+                # train_cost.set_value(i, cost_train) #
+                # train_r2.set_value(i, r2_train) #
+        cross_duration_cost[duration_cost.name] = duration_cost
+        cross_duration_r2[duration_r2.name] = duration_r2
+
+        # cross_duration_cost[train_cost.name] = train_cost   #
+        # cross_duration_r2[train_r2.name] = train_r2   #
+        network.sess.close()
+    cross_duration_cost.plot()
+    plt.ylabel('Cost')
+    plt.xlabel('Epoch')
+
+    cross_duration_r2.plot()
+    plt.ylabel('R2 score')
+    plt.xlabel('Epoch')
+
+    # final_cost = cross_duration_cost.iloc[-1, :]
+    # final_r2 = cross_duration_r2.iloc[-1, :]
+    # plt.figure(3)
+    # final_cost.plot()
+    # plt.ylabel('Cost')
+    # plt.xlabel('Duration')
+    # plt.figure(4)
+    # final_r2.plot()
+    # plt.ylabel('R2 score')
+    # plt.xlabel('Duration')
+
+    plt.show()
+
 if __name__ == '__main__':
-    path = r's3.pickle'
+    path = r'I80_l1.pickle'
     # path = r'/Users/MorvanZhou/Documents/python/2016_05_21_tfnn/road data/train_I80_lane_1_1s.pickle'
     # train(path)
     compare_real(path)
     # test()
+    # cross_validation(path)
