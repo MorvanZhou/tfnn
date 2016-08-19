@@ -9,11 +9,14 @@ def train(data_path):
     # xs = load_data.iloc[:, -60:]
     load_data = pd.read_pickle(data_path).dropna()
     # load_data = pd.read_csv(data_path, index_col=0).dropna()
-    duration = 0.2    # second
-    xs = pd.concat([load_data.iloc[:, -60-int(duration*10):-60],
-                    load_data.iloc[:, -40-int(duration*10):-40],
-                    load_data.iloc[:, -20-int(duration*10):-20]], axis=1)
-    print(xs.shape, xs.head(2))
+    duration = 0.8    # second
+    xs = pd.concat([load_data.iloc[:, -60-int(duration*10):-60],        # speed
+                    load_data.iloc[:, -40-int(duration*10):-40],        # leader speed
+                    load_data.iloc[:, -20-int(duration*10):-20]],        # spacing
+                    # load_data.iloc[:, -int(duration*10):]],             # relative speed
+                   axis=1)
+    print(xs.shape)
+    print(xs.head(2))
     print('sample size:', load_data.shape[0])
     # ys = load_data.a
     ys = load_data.deri_a_clipped
@@ -33,7 +36,7 @@ def train(data_path):
     evaluator = tfnn.Evaluator(network)
     summarizer = tfnn.Summarizer(network, save_path='/tmp/log')
 
-    for i in range(40000):
+    for i in range(60000):
         b_xs, b_ys = t_data.next_batch(100, loop=True)
         network.run_step(b_xs, b_ys, 0.5)
         if i % 1000 == 0:
@@ -50,13 +53,15 @@ def compare_real(path):
     # load_data = pd.read_pickle(data_path)
     load_data = pd.read_pickle(path).dropna().iloc[-10000:, :]
     # load_data = pd.read_csv(path, index_col=0).dropna()
-    s = 3300
+    s = 7900
     f = s + 300
     # xs = load_data.iloc[s:f, -60:]
     duration = 0.2
-    xs = pd.concat([load_data.iloc[s:f, -60 - int(duration*10):-60],
-                    load_data.iloc[s:f, -40 - int(duration*10):-40],
-                    load_data.iloc[s:f, -20 - int(duration*10):-20]], axis=1)
+    xs = pd.concat([load_data.iloc[s:f, -60 - int(duration*10):-60],    # speed
+                    load_data.iloc[s:f, -40 - int(duration*10):-40],    # leader speed
+                    load_data.iloc[s:f, -20 - int(duration*10):-20]],    # spacing
+                    # load_data.iloc[s:f, -int(duration * 10):]],           # relative speed
+                    axis=1)
     ys = load_data.deri_a_clipped[s:f]
     # ys = load_data.a[s:f]
     network_saver = tfnn.NetworkSaver()
@@ -184,9 +189,11 @@ def cross_validation(path):
         load_data = pd.read_pickle(path).dropna()
 
         # data include v, v_leader, dx
-        xs = pd.concat([load_data.iloc[:, -60 - int(duration * 10):-60],
-                        load_data.iloc[:, -40 - int(duration * 10):-40],
-                        load_data.iloc[:, -20 - int(duration * 10):-20]], axis=1)
+        xs = pd.concat([load_data.iloc[:, -60 - int(duration*10):-60],    # speed
+                        load_data.iloc[:, -40 - int(duration*10):-40],    # leader speed
+                        load_data.iloc[:, -20 - int(duration*10):-20]],    # spacing
+                        # load_data.iloc[:, -int(duration * 10):]],           # relative speed
+                        axis=1)
         ys = load_data.deri_a_clipped
         data = tfnn.Data(xs, ys, name='road_data')
 
@@ -202,6 +209,10 @@ def cross_validation(path):
         optimizer = tfnn.train.AdamOptimizer(0.001)
         network.set_optimizer(optimizer, global_step)
         evaluator = tfnn.Evaluator(network)
+
+        # duration_cost = pd.Series(name='%s' % lr)
+        # duration_r2 = pd.Series(name='%s' % lr)
+
         duration_cost = pd.Series(name='%s s' % duration)
         duration_r2 = pd.Series(name='%s s' % duration)
 
@@ -209,7 +220,7 @@ def cross_validation(path):
         # duration_r2 = pd.Series(name='Test')  #
         # train_cost = pd.Series(name='Train')  #
         # train_r2 = pd.Series(name='Train')  #
-        for i in range(40000):
+        for i in range(60000):
             b_xs, b_ys = t_data.next_batch(100, loop=True)
             network.run_step(b_xs, b_ys, 0.5)
             if i % 200 == 0:
@@ -237,21 +248,21 @@ def cross_validation(path):
     plt.ylabel('R2 score')
     plt.xlabel('Epoch')
 
-    # final_cost = cross_duration_cost.iloc[-1, :]
-    # final_r2 = cross_duration_r2.iloc[-1, :]
-    # plt.figure(3)
-    # final_cost.plot()
-    # plt.ylabel('Cost')
-    # plt.xlabel('Duration')
-    # plt.figure(4)
-    # final_r2.plot()
-    # plt.ylabel('R2 score')
-    # plt.xlabel('Duration')
+    final_cost = cross_duration_cost.iloc[-1, :]
+    final_r2 = cross_duration_r2.iloc[-1, :]
+    plt.figure(3)
+    final_cost.plot()
+    plt.ylabel('Cost')
+    plt.xlabel('Duration')
+    plt.figure(4)
+    final_r2.plot()
+    plt.ylabel('R2 score')
+    plt.xlabel('Duration')
 
     plt.show()
 
 if __name__ == '__main__':
-    path = r'I80_l1.pickle'
+    path = r'I80_lane4.pickle'
     # path = r'/Users/MorvanZhou/Documents/python/2016_05_21_tfnn/road data/train_I80_lane_1_1s.pickle'
     # train(path)
     compare_real(path)
