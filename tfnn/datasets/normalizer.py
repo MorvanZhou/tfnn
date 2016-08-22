@@ -10,17 +10,17 @@ class Normalizer(object):
         self.config = data_config
         self.method = data_config['normalize_method']
         if self.method == 'minmax':
-            self.xs_max = data_config['xs_max']
-            self.xs_min = data_config['xs_min']
+            self.xs_max = data_config['xs_max'].values
+            self.xs_min = data_config['xs_min'].values
             self.lower_bound = data_config["lower_bound"]
             self.upper_bound = data_config['upper_bound']
         elif self.method == 'mean':
-            self.xs_max = data_config['xs_max']
-            self.xs_min = data_config['xs_min']
+            self.xs_max = data_config['xs_max'].values
+            self.xs_min = data_config['xs_min'].values
             self.xs_mean = data_config['mean']
         elif self.method == 'std':
-            self.xs_mean = data_config['xs_mean']
-            self.xs_std = data_config['xs_std']
+            self.xs_mean = data_config['xs_mean'].values
+            self.xs_std = data_config['xs_std'].values
             self.mean = data_config['mean']
             self.std = data_config['std']
         self.config_exist = True
