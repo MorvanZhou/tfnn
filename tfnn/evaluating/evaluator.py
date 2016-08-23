@@ -109,9 +109,11 @@ class Evaluator(object):
             self.scat_soc = self.ax_soc.scatter(v_ys, predictions, label='predicted')
             self.ax_soc.plot([v_ys.min(), v_ys.max()], [v_ys.min(), v_ys.max()], 'r--', lw=4, label='real')
             self.ax_soc.grid(True)
-            self.ax_soc.legend()
+            self.ax_soc.legend(loc='upper left')
             self.ax_soc.set_xlabel('Real data')
-            self.ax_soc.set_ylim([v_ys.min()[0]*1.2, v_ys.max()[0]*1.2])
+            offset = 0.1 * (v_ys.max()[0] - v_ys.min()[0])
+            self.ax_soc.set_ylim([v_ys.min()[0] - offset, v_ys.max()[0] + offset])
+            self.ax_soc.set_xlim([v_ys.min()[0] - offset, v_ys.max()[0] + offset])
             self.ax_soc.set_ylabel('Predicted')
             if continue_plot:
                 plt.ion()

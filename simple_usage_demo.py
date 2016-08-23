@@ -20,7 +20,7 @@ network.set_optimizer()
 evaluator = tfnn.Evaluator(network)
 
 # similar to sklearn, we have fit function
-network.fit(mnist.train.images, mnist.train.labels)
+network.fit(mnist.train.images, mnist.train.labels, steps=2000)
 
 # use evaluator to compute accuracy and loss
 print(evaluator.compute_accuracy(xs=mnist.test.images, ys=mnist.test.labels))
