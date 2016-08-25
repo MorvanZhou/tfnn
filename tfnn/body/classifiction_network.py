@@ -1,9 +1,19 @@
 from tfnn.body.network import Network
 import tfnn
+import numpy as np
 
 
 class ClfNetwork(Network):
     def __init__(self, n_inputs, n_outputs, method='softmax', do_dropout=False, do_l2=False, seed=None):
+        """
+
+        :param input_size: if CNN, this is the image [length, width, channels]
+        :param output_size:
+        :param method:
+        :param do_dropout:
+        :param do_l2:
+        :param seed:
+        """
         if method == 'softmax':
             input_dtype = tfnn.float32
             output_dtype = tfnn.float32
@@ -23,18 +33,18 @@ class ClfNetwork(Network):
     def _init_loss(self):
         with tfnn.name_scope('predictions'):
             if self.method == 'softmax':
-                self.predictions = tfnn.nn.softmax(self.layers_final_output.iloc[-1], name='predictions')
+                self.predictions = tfnn.nn.softmax(self.layers_results['final'].iloc[-1], name='predictions')
             elif self.method == 'sigmoid':
-                self.predictions = tfnn.nn.sigmoid(self.layers_final_output.iloc[-1], name='predictions')
+                self.predictions = tfnn.nn.sigmoid(self.layers_results['final'].iloc[-1], name='predictions')
         with tfnn.name_scope('loss'):
             if self.method == 'softmax':
                 self.cross_entropy = tfnn.nn.softmax_cross_entropy_with_logits(
-                    self.layers_final_output.iloc[-1],
+                    self.layers_results['final'].iloc[-1],
                     self.target_placeholder,
                     name='xentropy')
             elif self.method == 'sigmoid':
                 self.cross_entropy = tfnn.nn.sigmoid_cross_entropy_with_logits(
-                    self.layers_final_output.iloc[-1],
+                    self.layers_results['final'].iloc[-1],
                     self.target_placeholder,
                     name='xentropy')
             else:
@@ -51,3 +61,20 @@ class ClfNetwork(Network):
                     self.loss += regularizers
 
             tfnn.scalar_summary('loss', self.loss)
+
+    def predict(self, xs):
+        if np.ndim(xs) == 1:
+            xs = xs[np.newaxis, :]
+        predictions = self.sess.run(self.predictions, feed_dict={self.data_placeholder: xs})
+        predictions = np.argmax(predictions, axis=1)
+        if predictions.size == 1:
+            predictions = predictions[0][0]
+        return predictions
+
+    def predict_prob(self, xs):
+        if np.ndim(xs) == 1:
+            xs = xs[np.newaxis, :]
+        predictions = self.sess.run(self.predictions, feed_dict={self.data_placeholder: xs})
+        if predictions.size == 1:
+            predictions = predictions[0][0]
+        return predictions

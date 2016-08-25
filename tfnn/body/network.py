@@ -8,8 +8,8 @@ class Network(object):
     def __init__(self, n_inputs, n_outputs, input_dtype, output_dtype, output_activator,
                  do_dropout, do_l2, seed=None):
         self.normalizer = Normalizer()
-        self.n_inputs = n_inputs
-        self.n_outputs = n_outputs
+        self.input_size = n_inputs
+        self.output_size = n_outputs
         self.input_dtype = input_dtype
         self.output_dtype = output_dtype
         self.output_activator = output_activator
@@ -32,23 +32,32 @@ class Network(object):
             if do_l2:
                 self.l2_placeholder = tfnn.placeholder(tfnn.float32)
                 tfnn.scalar_summary('l2_lambda', self.l2_placeholder)
-        self.layers_type = pd.Series([])
-        self.layers_name = pd.Series([])
-        self.layers_output = pd.Series([])
-        self.layers_activated_output = pd.Series([])
-        self.layers_dropped_output = pd.Series([])
-        self.layers_final_output = pd.Series([])
+        _input_layer_configs = \
+            {'type': ['input'],
+             'name': ['input_layer'],
+             'neural_structure': [{'input_size': n_inputs, 'output_size': n_inputs}],
+             'para': [None]}
+        _input_layer_results = \
+            {'Wx_plus_b': [None],
+             'activated': [None],
+             'dropped': [None],
+             'final': [self.data_placeholder]}
+
+        self.layers_configs = pd.DataFrame(_input_layer_configs)
+        self.layers_results = pd.DataFrame(_input_layer_results)
         self.Ws = pd.Series([])
         self.bs = pd.Series([])
-        self.record_activators = pd.Series([])
-        self.record_neurons = pd.Series([])
-        self.last_layer_neurons = n_inputs
-        self.last_layer_outputs = self.data_placeholder
-        self.layer_number = 1
-        self.has_output_layer = False
-        self._is_output_layer = False
 
     def add_fc_layer(self, n_neurons, activator=None, dropout_layer=False, name=None):
+        if self.layers_configs['type'].iloc[-1] == 'conv':
+            conv_shape = self.layers_configs['neural_structure'].iloc[-1]['output_size']
+            flat_shape = conv_shape[0] * conv_shape[1] * conv_shape[2]
+            self.layers_configs['neural_structure'].iloc[-1]['output_size'] = flat_shape
+            with tfnn.name_scope('flatten_conv_output'):
+                flat_result = tfnn.reshape(self.layers_results['final'].iloc[-1],
+                                           [-1, flat_shape], name='flatten_tensor')
+            self.layers_results['final'].iloc[-1] = flat_result
+
         self._add_layer(n_neurons, activator, dropout_layer, name, layer_type='fc')
 
     def add_hidden_layer(self, n_neurons, activator=None, dropout_layer=False, name=None):
@@ -62,72 +71,148 @@ class Network(object):
         """
         self._add_layer(n_neurons, activator, dropout_layer, name, layer_type='hidden')
 
-    def add_conv_layer(self, patch_x, patch_y, in_features, out_features,
-                       activator=None, dropout_layer=False, name=None):
+    def add_conv_layer(self, patch_x, patch_y, n_features,
+                       activator=None, pool='max', dropout_layer=False,
+                       image_shape=None, name=None):
+        """
+
+        :param patch_x:
+        :param patch_y:
+        :param n_features:
+        :param activator:
+        :param pool:
+        :param dropout_layer:
+        :param image_shape: should be a tuple or list of image (length, width, channels)
+        :param name:
+        :return:
+        """
         def conv2d(x, W):
             # stride [1, x_movement, y_movement, 1]
             # Must have strides[0] = strides[3] = 1
             return tfnn.nn.conv2d(input=x, filter=W,
                                   strides=[1, 1, 1, 1], padding='SAME')
 
-        def pool_2x2(x, method='max'):
+        def pool_2x2(x, layer_size, method='max', x_strides=2, y_strides=2):
             # stride [1, x_movement, y_movement, 1]
             if method == 'max':
                 result = tfnn.nn.max_pool(value=x, ksize=[1, 2, 2, 1],
-                                          strides=[1, 2, 2, 1], padding='SAME')
+                                          strides=[1, x_strides, y_strides, 1], padding='SAME')
             elif method == 'average':
                 result = tfnn.nn.avg_pool(value=x, ksize=[1, 2, 2, 1],
-                                          strides=[1, 2, 2, 1], padding='SAME')
+                                          strides=[1, x_strides, y_strides, 1], padding='SAME')
             else:
                 raise ValueError('No method called %s' % method)
-            return result
+            length = layer_size[0]/x_strides
+            width = layer_size[1]/y_strides
+            features = layer_size[2]
+            if not (type(length) == int) and (type(width) == int):
+                raise ValueError('pooling dimension error')
+            else:
+                _out_size = [int(length), int(width), features]
+            return [result, _out_size]
 
-        W_conv = self._weight_variable([patch_x, patch_y, in_features, out_features])  # patch 5x5, in size 1, out size 32
-        b_conv = self._bias_variable([out_features, ])
-        if activator is not None:
-            activated_product = activator(conv2d(self.last_layer_outputs, W_conv) + b_conv)  # output size 28x28x32
-        else:
-            activated_product = conv2d(self.last_layer_outputs, W_conv) + b_conv
-        pooled_product = pool_2x2(activated_product, method='max')
-        if (self.reg == 'dropout') and dropout_layer:
-            dropped_product = tfnn.nn.dropout(pooled_product,
-                                              self.keep_prob_placeholder,
-                                              seed=self.seed, name='dropout')
-            self.layers_dropped_output.set_value(label=len(self.layers_dropped_output),
-                                                 value=dropped_product)
-            final_product = dropped_product
-        else:
-            final_product = activated_product
+        def check_name(name):
+            if name is None:
+                layer_name = 'conv_layer'
+            else:
+                layer_name = name
 
-        self.layers_type.set_value(len(self.layers_type), "conv")
-        self.last_layer_outputs = final_product
-        self.layer_number += 1
+            # check repeated name
+            if self.layers_configs['name'].isin([layer_name]).any():
+                _counter = 0
+                while True:
+                    _counter += 1
+                    new_layer_name = layer_name + '_%i' % _counter
+                    if not self.layers_configs['name'].isin([new_layer_name]).any():
+                        layer_name = new_layer_name
+                        break
+            return layer_name
+
+        def check_image_shape(image_shape):
+            if image_shape is not None:
+                if len(self.layers_configs) == 1:
+                    if type(image_shape) is tuple:
+                        image_shape = list(image_shape)
+                    elif type(image_shape) is list:
+                        pass
+                    else:
+                        raise ValueError('image_shape can only be a tuple or list')
+                    self.layers_configs['neural_structure'].iloc[-1]['output_size'] = image_shape
+                    _xs_placeholder = self.layers_results['final'].iloc[-1]
+                    replaced_image_shape = image_shape.copy()
+                    replaced_image_shape.insert(0, -1)
+                    with tfnn.name_scope('reshape_inputs'):
+                        _image_placeholder = tfnn.reshape(_xs_placeholder, replaced_image_shape)
+                    self.layers_results['final'].iloc[-1] = _image_placeholder
+                else:
+                    raise IndexError('This is not the first conv layer, must not use image_shape')
+
+        check_image_shape(image_shape)
+        layer_name = check_name(name)
+        # in conv, the _in_size should be the [length, width, channels]
+        _in_size = self.layers_configs['neural_structure'].iloc[-1]['output_size']
+        with tfnn.variable_scope(layer_name):
+            W_conv = self._weight_variable(
+                [patch_x,
+                 patch_y,
+                 _in_size[-1],
+                 n_features])  # patch 5x5, in size 1, out size 32
+            tfnn.histogram_summary(layer_name + '/weights', W_conv)
+            b_conv = self._bias_variable([n_features, ])
+            tfnn.histogram_summary(layer_name + '/biases', b_conv)
+
+            with tfnn.name_scope('Wx_plus_b'):
+                product = conv2d(self.layers_results['final'].iloc[-1], W_conv) + b_conv
+
+            if activator is not None:
+                activated_product = activator(product)  # output size 28x28x32
+            else:
+                activated_product = product
+            tfnn.histogram_summary(layer_name + '/activated_product', activated_product)
+
+            _out_size = _in_size.copy()
+            _out_size[-1] = n_features
+            # pooling process
+            pooled_product, _out_size = pool_2x2(activated_product, _out_size, method=pool)
+            tfnn.histogram_summary(layer_name + '/pooled_product', pooled_product)
+
+            if (self.reg == 'dropout') and dropout_layer:
+                dropped_product = tfnn.nn.dropout(pooled_product,
+                                                  self.keep_prob_placeholder,
+                                                  seed=self.seed, name='dropout')
+                final_product = dropped_product
+            else:
+                dropped_product = None
+                final_product = pooled_product
+
+        activator_name = activated_product.name.split('/')[-1].split(':')[0] \
+            if 'Wx_add_b' not in activated_product.name else None
+        _layer_configs_dict = \
+            {'type': 'conv',
+             'name': layer_name,
+             'neural_structure': {'input_size': _in_size, 'output_size': _out_size},
+             'para': {'patch_x': patch_x, 'patch_y': patch_y, 'n_features': n_features,
+                      'activator': activator_name, 'pool': pool, 'dropout_layer': dropout_layer,
+                      'image_shape': image_shape, 'name': name}}
+        _layer_results_dict = \
+            {'Wx_plus_b': product,
+             'activated': activated_product,
+             'dropped': dropped_product,
+             'final': final_product}
+
+        self.layers_configs = self.layers_configs.append(_layer_configs_dict, ignore_index=True)
+        self.layers_results = self.layers_results.append(_layer_results_dict, ignore_index=True)
         self.Ws.set_value(label=len(self.Ws), value=W_conv)
         self.bs.set_value(label=len(self.bs), value=b_conv)
-        if activator is None:
-            self.record_activators.set_value(label=len(self.record_activators), value=None)
-        else:
-            self.record_activators.set_value(label=len(self.record_activators), value=activator(0).name)
-        self.record_neurons.append(n_neurons)
-        self.layers_output.set_value(label=len(self.layers_output),
-                                     value=pooled_product)
 
-        self.layers_activated_output.set_value(label=len(self.layers_output),
-                                               value=activated_product)
-        self.layers_final_output.set_value(label=len(self.layers_final_output),
-                                           value=final_product)
-        self.last_layer_neurons = n_neurons
-
-    def add_output_layer(self, activator, dropout_layer=False, name=None):
-        self._is_output_layer = True
-        self._add_layer(self.n_outputs, activator, dropout_layer, name, layer_type='output')
+    def add_output_layer(self, activator=None, dropout_layer=False, name=None):
+        self._add_layer(self.output_size, activator, dropout_layer, name, layer_type='output')
         self._init_loss()
-        self.has_output_layer = True
 
     def set_optimizer(self, optimizer=None, global_step=None,):
         if optimizer is None:
             optimizer = tfnn.train.GradientDescentOptimizer(0.01)
-        if not self.has_output_layer:
+        if self.layers_configs['type'].iloc[-1] != 'output':
             raise NotImplementedError('Please add output layer.')
         with tfnn.name_scope('trian'):
             self.train_op = optimizer.minimize(self.loss, global_step)
@@ -214,16 +299,14 @@ class Network(object):
         return _bs
 
     def predict(self, xs):
-        if np.ndim(xs) == 1:
-            xs = xs[np.newaxis, :]
-        predictions = self.sess.run(self.predictions, feed_dict={self.data_placeholder: xs})
-        if predictions.size == 1:
-            predictions = predictions[0][0]
-        return predictions
+        pass
 
     def save(self, path='/tmp/'):
         saver = tfnn.NetworkSaver()
         saver.save(self, path)
+
+    def close(self):
+        self.sess.close()
 
     def _add_layer(self, n_neurons, activator=None, dropout_layer=False, name=None, layer_type=None,):
         """
@@ -234,81 +317,86 @@ class Network(object):
         :param activator: The activation function
         :return:
         """
-        if layer_type == 'hidden':
-            if name is None:
-                layer_name = 'hidden_layer%i' % self.layer_number
+        def check_name(layer_type, name):
+            if layer_type == 'hidden':
+                if name is None:
+                    layer_name = 'hidden_layer'
+                else:
+                    layer_name = name
+            elif layer_type == 'output':
+                if name is None:
+                    layer_name = 'output_layer'
+                else:
+                    layer_name = name
+            elif layer_type == 'fc':
+                if name is None:
+                    layer_name = 'fc_layer'
+                else:
+                    layer_name = name
+            elif layer_type == 'conv':
+                if name is None:
+                    layer_name = 'conv_layer'
+                else:
+                    layer_name = name
             else:
-                layer_name = name
-        elif layer_type == 'output':
-            if name is None:
-                layer_name = 'output_layer'
-            else:
-                layer_name = name
-        elif layer_type == 'fc':
-            if name is None:
-                layer_name = 'fc_layer%i' % self.layer_number
-            else:
-                layer_name = name
-        elif layer_type == 'conv':
-            if name is None:
-                layer_name = 'conv_layer%i' % self.layer_number
-            else:
-                layer_name = name
-        else:
-            raise ValueError('layer_type not support %s' % layer_type)
+                raise ValueError('layer_type not support %s' % layer_type)
 
-        # check repeated name
-        if self.layers_name.isin([layer_name]).any():
-            _counter = 0
-            while True:
-                _counter += 1
-                new_layer_name = layer_name + _counter
-                if not self.layers_name.isin([new_layer_name]).any():
-                    layer_name = new_layer_name
-                    break
+            # check repeated name
+            if self.layers_configs['name'].isin([layer_name]).any():
+                _counter = 0
+                while True:
+                    _counter += 1
+                    new_layer_name = layer_name + '_%i' % _counter
+                    if not self.layers_configs['name'].isin([new_layer_name]).any():
+                        layer_name = new_layer_name
+                        break
+            return layer_name
 
+        layer_name = check_name(layer_type, name)
+
+        _input_size = self.layers_configs['neural_structure'].iloc[-1]['output_size']   # this is from last layer
         with tfnn.variable_scope(layer_name):
-            W = self._weight_variable([self.last_layer_neurons, n_neurons])
+            W = self._weight_variable([_input_size, n_neurons])
             tfnn.histogram_summary(layer_name+'/weights', W)
             b = self._bias_variable([n_neurons, ])
             tfnn.histogram_summary(layer_name + '/biases', b)
 
             with tfnn.name_scope('Wx_plus_b'):
-                product = tfnn.add(tfnn.matmul(self.last_layer_outputs, W, name='Wx'), b, name='Wx_plus_b')
+                product = tfnn.add(tfnn.matmul(self.layers_results['final'].iloc[-1], W, name='Wx'),
+                                   b, name='Wx_add_b')
+
             if activator is None:
                 activated_product = product
             else:
                 activated_product = activator(product)
             tfnn.histogram_summary(layer_name+'/activated_product', activated_product)
+
             if (self.reg == 'dropout') and dropout_layer:
                 dropped_product = tfnn.nn.dropout(activated_product,
-                                                self.keep_prob_placeholder,
-                                                seed=self.seed, name='dropout')
-                self.layers_dropped_output.set_value(label=len(self.layers_dropped_output),
-                                                     value=dropped_product)
+                                                  self.keep_prob_placeholder,
+                                                  seed=self.seed, name='dropout')
                 final_product = dropped_product
             else:
+                dropped_product = None
                 final_product = activated_product
 
-        self.layers_type.set_value(len(self.layers_type), layer_type)
-        self.layers_name.set_value(len(self.layers_name), layer_name)
-        self.layer_number += 1
-        self.last_layer_outputs = final_product
+        activator_name = activated_product.name.split('/')[-1].split(':')[0] \
+            if 'Wx_add_b' not in activated_product.name else None
+        _layer_configs_dict = \
+            {'type': layer_type,
+             'name': layer_name,
+             'neural_structure': {'input_size': _input_size, 'output_size': n_neurons},
+             'para': {'n_neurons': n_neurons, 'activator': activator_name,
+                      'dropout_layer': dropout_layer, 'name': name}}
+        _layer_results_dict = \
+            {'Wx_plus_b': product,
+             'activated': activated_product,
+             'dropped': dropped_product,
+             'final': final_product}
+        self.layers_configs = self.layers_configs.append(_layer_configs_dict, ignore_index=True)
+        self.layers_results = self.layers_results.append(_layer_results_dict, ignore_index=True)
         self.Ws.set_value(label=len(self.Ws), value=W)
         self.bs.set_value(label=len(self.bs), value=b)
-        if activator is None:
-            self.record_activators.set_value(label=len(self.record_activators), value=None)
-        else:
-            self.record_activators.set_value(label=len(self.record_activators), value=activator(0).name)
-        self.record_neurons.set_value(label=len(self.record_neurons), value=n_neurons)
-
-        self.layers_output.set_value(label=len(self.layers_output),
-                                     value=product)
-        self.layers_activated_output.set_value(label=len(self.layers_output),
-                                               value=activated_product)
-        self.layers_final_output.set_value(label=len(self.layers_final_output),
-                                           value=final_product)
-        self.last_layer_neurons = n_neurons
 
     def _weight_variable(self, shape, initialize='truncated_normal'):
         if initialize == 'truncated_normal':
@@ -318,7 +406,7 @@ class Network(object):
         else:
             raise ValueError('initializer not support %s' % initialize)
         return tfnn.get_variable(name='weights', shape=shape, dtype=self.input_dtype,
-                                 initializer=initializer, trainable=True)
+                                 initializer=initializer, trainable=True,)
 
     def _bias_variable(self, shape):
         return tfnn.get_variable(name='biases', shape=shape, dtype=self.input_dtype,
@@ -326,4 +414,5 @@ class Network(object):
                                  trainable=True)
 
     def _init_loss(self):
+        """do not use in network.py"""
         self.loss = None

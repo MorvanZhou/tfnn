@@ -4,16 +4,24 @@ import tfnn
 
 
 class Summarizer(object):
-    def __init__(self, network, save_path='/tmp/log', ):
-        self.save_path = save_path
-        folder = save_path.split('/')[-1]
-        name_len = len(folder)
-        if folder in os.listdir(save_path[:-name_len]):
-            shutil.rmtree(save_path)
-        self.merged = tfnn.merge_all_summaries()
-        self.train_writer = tfnn.train.SummaryWriter(save_path + '/train', network.sess.graph)
-        self.validate_writer = tfnn.train.SummaryWriter(save_path + '/validate', )
+    def __init__(self, network=None, save_path='/tmp', ):
         self._network = network
+        if network is not None:
+            check_dir = os.getcwd() + save_path
+            if os.path.isdir(check_dir):
+                self.save_path = check_dir
+            elif os.path.isdir(save_path):
+                self.save_path = save_path
+            else:
+                raise NotADirectoryError('the directory is not exist: %s' % save_path)
+
+            folder = 'tensorflow_logs'
+            if folder in os.listdir(self.save_path):
+                shutil.rmtree(self.save_path+'/'+folder)
+            self.merged = tfnn.merge_all_summaries()
+            self.train_writer = tfnn.train.SummaryWriter(self.save_path + '/' + folder + '/train',
+                                                         network.sess.graph)
+            self.validate_writer = tfnn.train.SummaryWriter(self.save_path + '/' + folder + '/validate', )
 
     def record_train(self, t_xs, t_ys, global_step, *args):
         if self._network.reg == 'dropout':
@@ -51,7 +59,13 @@ class Summarizer(object):
         validate_result = self._network.sess.run(self.merged, feed_dict)
         self.validate_writer.add_summary(validate_result, global_step)
 
-    def web_visualize(self):
-        os.system('tensorboard --logdir=%s' % self.save_path)
+    def web_visualize(self, path=None):
+        whole_path = self.save_path + '/tensorflow_logs'
+        if (path is None) and (self._network is not None):
+            os.system('tensorboard --logdir=%s' % whole_path)
+        elif (path is None) and (not hasattr(self, '_network')):
+            raise ValueError('please give path to logs')
+        else:
+            os.system('tensorboard --logdir=%s' % path)
 
 
