@@ -27,11 +27,11 @@ print('real data value:')
 print(mnist.test.labels[10:14].argmax(axis=1))
 
 # save network
-network.save(path='tmp')
+network.save(name='model', path='tmp')
 
 # reload network
 saver = tfnn.NetworkSaver()
-network2 = saver.restore(path='tmp')
+network2 = saver.restore(name='model', path='tmp')
 print('\nLoaded network predict:')
 print(network2.predict(mnist.test.images[10:14]))
 

@@ -42,13 +42,13 @@ for i in range(1000):
     if i % 50 == 0:
         # print(evaluator.compute_accuracy(v_data.xs, v_data.ys))
         # evaluator.regression_plot_linear_comparison(mnist.test.images, mnist.test.labels, True)
-        evaluator.regression_plot_linear_comparison(v_data.xs, v_data.ys, True)
+        # evaluator.regression_plot_linear_comparison(v_data.xs, v_data.ys, True)
         # evaluator.regression_plot_nonlinear_comparison(v_data.xs, v_data.ys, continue_plot=True)
-        print(evaluator.compute_cost(v_data.xs, v_data.ys))
+        # print(evaluator.compute_cost(v_data.xs, v_data.ys))
         # print(evaluator.compute_accuracy(b_xs, b_ys))
         summarizer.record_train(b_xs, b_ys, i, 0.5)
-        summarizer.record_validate(v_data.xs, v_data.ys, i)
-        # summarizer.record_validate(mnist.test.images, mnist.test.labels, i)
+        # summarizer.record_test(v_data.xs, v_data.ys, i)
+        # summarizer.record_test(mnist.test.images, mnist.test.labels, i)
 
 summarizer.web_visualize()
 network.sess.close()

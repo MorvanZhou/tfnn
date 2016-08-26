@@ -7,16 +7,25 @@ class NetworkSaver(object):
     """
     Save, rebuild and restore network.
     """
-    def save(self, network, path='/tmp/'):
+    def __init__(self):
+        self._configs_saved = False
+        self._available_checkpoints = []
+
+    def save(self, network, name='new_model', path=None, global_step=None):
         """
         save network config and normalized data config
         :param network: trained network
         :param path: save to path
+        :param global_step: default None.
         """
+        self._network = network
+
+        if path is None:
+            path = '/'
         if path[0] != '/':
             path = '/' + path
         if path[-1] != '/':
-            path = path + '/'
+            path += '/'
 
         check_dir = os.getcwd() + path
         if os.path.isdir(check_dir):
@@ -26,23 +35,39 @@ class NetworkSaver(object):
         else:
             raise NotADirectoryError('the directory is not exist: %s' % path)
 
-        saver = tfnn.train.Saver()
-        variables_path = save_path+'variables/'
-        config_path = save_path+'configs/'
-        if not os.path.exists(variables_path):
-            os.makedirs(variables_path)
-        if not os.path.exists(config_path):
-            os.makedirs(config_path)
-        model_path = saver.save(network.sess, variables_path + 'network.ckpt')
-        network_configs = {'name': network.name,
-                          'layers_configs': network.layers_configs,
-                          'data_config': network.normalizer.config}
-        with open(config_path+'network_configs.pickle', 'wb') as file:
-            pickle.dump(network_configs, file)
-        print("Model saved in file: %s" % save_path)
-        self._network = network
+        if os.path.isdir(save_path+name) and (not self._configs_saved):
+            raise FileExistsError('%s in %s already exists' % (name, save_path))
+        else:
+            save_path = save_path + name
+        _saver = tfnn.train.Saver()
 
-    def restore(self, path='tmp/'):
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+
+        model_path = _saver.save(network.sess, save_path + '/net_variables',
+                                global_step=global_step, write_meta_graph=False)
+
+        if global_step is not None:
+            self._available_checkpoints.append(global_step)
+            with open(save_path + '/available_cps.pickle', 'wb') as file:
+                pickle.dump(self._available_checkpoints, file)
+
+        if not self._configs_saved:
+            self._configs_saved = True
+            network_configs = {'name': network.name,
+                              'layers_configs': network.layers_configs,
+                              'data_config': network.normalizer.config}
+            with open(save_path+'/net_configs.pickle', 'wb') as file:
+                pickle.dump(network_configs, file)
+
+    def restore(self, name='new_model', path=None, checkpoint=None):
+        if path is None:
+            path = '/'
+        if path[0] != '/':
+            path = '/' + path
+        if path[-1] != '/':
+            path += '/'
+
         check_dir = os.getcwd() + path
         if os.path.isdir(check_dir):
             path = check_dir
@@ -51,7 +76,7 @@ class NetworkSaver(object):
         else:
             raise NotADirectoryError('the directory is not exist: %s' % path)
 
-        config_path = path + '/configs/network_configs.pickle'
+        config_path = path + name + '/net_configs.pickle'
 
         # reset graph to build a new network independently
         tfnn.reset_default_graph()
@@ -102,49 +127,24 @@ class NetworkSaver(object):
             elif layer_type == 'output':
                 network.add_output_layer(activator, layer_drop, layer_name)
             elif layer_type == 'conv':
-                network.add_conv_layer(para['patch_x'], para['patch_y'], para['n_features'],
+                network.add_conv_layer(para['patch_x'], para['patch_y'], para['n_filters'],
                                        activator, para['pool'], layer_drop, para['image_shape'],
                                        layer_name)
         network.sess = tfnn.Session()
         self._network = network
-        saver = tfnn.train.Saver()
+        _saver = tfnn.train.Saver()
         self._network._init = tfnn.initialize_all_variables()
         self._network.sess.run(self._network._init)
-        saver.restore(self._network.sess, path + '/variables/network.ckpt')
-        print('Model restored.')
+        if checkpoint is not None:
+            var_path = '/net_variables-%i' % checkpoint
+        else:
+            var_path = '/net_variables'
+        try:
+            _saver.restore(self._network.sess, path + name + var_path)
+        except ValueError:
+            with open(path + name + '/available_cps.pickle', 'rb') as file:
+                available_checkpoints = pickle.load(file)
+            raise ValueError('Please define a checkpoint value for restoring. The available checkpoints are:',
+                             available_checkpoints)
+
         return self._network
-
-if __name__ == '__main__':
-    from sklearn.datasets import load_boston
-    from tensorflow.python.platform import gfile
-    xs = load_boston().data
-    ys = load_boston().target
-    data = tfnn.Data(xs, ys)
-
-
-    def save():
-        network = tfnn.RegNetwork(xs.shape[1], ys.shape[1], do_dropout=True)
-        network.add_hidden_layer(100, activator=tfnn.nn.relu, dropout_layer=True)
-        network.add_output_layer(activator=None)
-        optimizer = tfnn.train.GradientDescentOptimizer(0.5)
-        network.set_optimizer(optimizer)
-        tfnn.train.write_graph(network.sess.graph_def, '/tmp/load', name='test.pb', as_text=False)
-
-        for i in range(1000):
-            b_xs, b_ys = data.next_batch(50, loop=True)
-            network.run_step(b_xs, b_ys, 0.5)
-        saver = tfnn.train.Saver(tfnn.all_variables())
-        saver.save(network.sess, "checkpoint.data")
-
-    def restore():
-        with tfnn.Session() as persisted_sess:
-            with gfile.FastGFile("/tmp/load/test.pb", 'rb') as f:
-                graph_def = tfnn.GraphDef()
-                graph_def.ParseFromString(f.read())
-                persisted_sess.graph.as_default()
-                tfnn.import_graph_def(graph_def, name='')
-
-    saver = NetworkSaver()
-    network = saver.restore(path='/tmp/')
-    print(network.layers_configs)
-    network.layers_configs.to_csv()

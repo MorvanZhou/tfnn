@@ -53,9 +53,10 @@ class Network(object):
             conv_shape = self.layers_configs['neural_structure'].iloc[-1]['output_size']
             flat_shape = conv_shape[0] * conv_shape[1] * conv_shape[2]
             self.layers_configs['neural_structure'].iloc[-1]['output_size'] = flat_shape
-            with tfnn.name_scope('flatten_conv_output'):
-                flat_result = tfnn.reshape(self.layers_results['final'].iloc[-1],
-                                           [-1, flat_shape], name='flatten_tensor')
+
+            flat_result = tfnn.reshape(
+                self.layers_results['final'].iloc[-1],
+                [-1, flat_shape], name='flat4fc')
             self.layers_results['final'].iloc[-1] = flat_result
 
         self._add_layer(n_neurons, activator, dropout_layer, name, layer_type='fc')
@@ -71,7 +72,7 @@ class Network(object):
         """
         self._add_layer(n_neurons, activator, dropout_layer, name, layer_type='hidden')
 
-    def add_conv_layer(self, patch_x, patch_y, n_features,
+    def add_conv_layer(self, patch_x, patch_y, n_filters,
                        activator=None, pool='max', dropout_layer=False,
                        image_shape=None, name=None):
         """
@@ -86,19 +87,19 @@ class Network(object):
         :param name:
         :return:
         """
-        def conv2d(x, W):
+        def conv2d(image, filters):
             # stride [1, x_movement, y_movement, 1]
             # Must have strides[0] = strides[3] = 1
-            return tfnn.nn.conv2d(input=x, filter=W,
+            return tfnn.nn.conv2d(input=image, filter=filters,
                                   strides=[1, 1, 1, 1], padding='SAME')
 
-        def pool_2x2(x, layer_size, method='max', x_strides=2, y_strides=2):
+        def pool_2x2(image, layer_size, method='max', x_strides=2, y_strides=2):
             # stride [1, x_movement, y_movement, 1]
             if method == 'max':
-                result = tfnn.nn.max_pool(value=x, ksize=[1, 2, 2, 1],
+                result = tfnn.nn.max_pool(value=image, ksize=[1, 2, 2, 1],
                                           strides=[1, x_strides, y_strides, 1], padding='SAME')
             elif method == 'average':
-                result = tfnn.nn.avg_pool(value=x, ksize=[1, 2, 2, 1],
+                result = tfnn.nn.avg_pool(value=image, ksize=[1, 2, 2, 1],
                                           strides=[1, x_strides, y_strides, 1], padding='SAME')
             else:
                 raise ValueError('No method called %s' % method)
@@ -152,14 +153,38 @@ class Network(object):
         # in conv, the _in_size should be the [length, width, channels]
         _in_size = self.layers_configs['neural_structure'].iloc[-1]['output_size']
         with tfnn.variable_scope(layer_name):
-            W_conv = self._weight_variable(
-                [patch_x,
-                 patch_y,
-                 _in_size[-1],
-                 n_features])  # patch 5x5, in size 1, out size 32
-            tfnn.histogram_summary(layer_name + '/weights', W_conv)
-            b_conv = self._bias_variable([n_features, ])
-            tfnn.histogram_summary(layer_name + '/biases', b_conv)
+            with tfnn.variable_scope('weights') as weights_scope:
+                W_conv = self._weight_variable(
+                    [patch_x,       # patch length
+                     patch_y,       # patch width
+                     _in_size[-1],  # filter height / channels
+                     n_filters])    # number of filters
+                tfnn.histogram_summary(layer_name + '/weights', W_conv)
+
+                # the image summary for visualizing filters
+                weights_scope.reuse_variables()
+                weights = tfnn.get_variable('weights')
+                # scale weights to [0 255] and convert to uint8 (maybe change scaling?)
+                x_min = tfnn.reduce_min(weights)
+                x_max = tfnn.reduce_max(weights)
+                weights_0_to_1 = (weights - x_min) / (x_max - x_min)
+                weights_0_to_255_uint8 = tfnn.image.convert_image_dtype(weights_0_to_1, dtype=tfnn.uint8)
+                # to tf.image_summary format [batch_size, height, width, channels]
+                W_transposed = tfnn.transpose(weights_0_to_255_uint8, [3, 0, 1, 2])
+                # image Tensor must be 4-D with last dim 1, 3, or 4,
+                # (n_filter, length, width, channel)
+                channels_to_look = 3
+                if W_transposed._shape[-1] > channels_to_look:
+                    n_chunks = int(W_transposed._shape[-1] // channels_to_look)
+                    W_transposed = tfnn.split(3, n_chunks,
+                                              W_transposed[:, :, :, :n_chunks*channels_to_look])[0]
+                # this will display random 5 filters from the n_filters in conv
+                tfnn.image_summary(layer_name + '/filters',
+                                   W_transposed, max_images=10)
+
+            with tfnn.variable_scope('biases'):
+                b_conv = self._bias_variable([n_filters, ])
+                tfnn.histogram_summary(layer_name + '/biases', b_conv)
 
             with tfnn.name_scope('Wx_plus_b'):
                 product = conv2d(self.layers_results['final'].iloc[-1], W_conv) + b_conv
@@ -171,19 +196,20 @@ class Network(object):
             tfnn.histogram_summary(layer_name + '/activated_product', activated_product)
 
             _out_size = _in_size.copy()
-            _out_size[-1] = n_features
-            # pooling process
+            _out_size[-1] = n_filters
+        # pooling process
+        with tfnn.name_scope('pool'):
             pooled_product, _out_size = pool_2x2(activated_product, _out_size, method=pool)
             tfnn.histogram_summary(layer_name + '/pooled_product', pooled_product)
 
-            if (self.reg == 'dropout') and dropout_layer:
-                dropped_product = tfnn.nn.dropout(pooled_product,
-                                                  self.keep_prob_placeholder,
-                                                  seed=self.seed, name='dropout')
-                final_product = dropped_product
-            else:
-                dropped_product = None
-                final_product = pooled_product
+        if (self.reg == 'dropout') and dropout_layer:
+            dropped_product = tfnn.nn.dropout(pooled_product,
+                                              self.keep_prob_placeholder,
+                                              seed=self.seed, name='dropout')
+            final_product = dropped_product
+        else:
+            dropped_product = None
+            final_product = pooled_product
 
         activator_name = activated_product.name.split('/')[-1].split(':')[0] \
             if 'Wx_add_b' not in activated_product.name else None
@@ -191,7 +217,7 @@ class Network(object):
             {'type': 'conv',
              'name': layer_name,
              'neural_structure': {'input_size': _in_size, 'output_size': _out_size},
-             'para': {'patch_x': patch_x, 'patch_y': patch_y, 'n_features': n_features,
+             'para': {'patch_x': patch_x, 'patch_y': patch_y, 'n_filters': n_filters,
                       'activator': activator_name, 'pool': pool, 'dropout_layer': dropout_layer,
                       'image_shape': image_shape, 'name': name}}
         _layer_results_dict = \
@@ -215,10 +241,10 @@ class Network(object):
         if self.layers_configs['type'].iloc[-1] != 'output':
             raise NotImplementedError('Please add output layer.')
         with tfnn.name_scope('trian'):
-            self.train_op = optimizer.minimize(self.loss, global_step)
+            self._train_op = optimizer.minimize(self.loss, global_step, name='train_op')
         self.sess = tfnn.Session()
 
-    def run_step(self, feed_xs, feed_ys, *args):
+    def run_step(self, feed_xs, feed_ys, keep_prob=None, l2=None):
         if np.ndim(feed_xs) == 1:
             feed_xs = feed_xs[np.newaxis, :]
         if np.ndim(feed_ys) == 1:
@@ -229,20 +255,22 @@ class Network(object):
             self.sess.run(self._init)
 
         if self.reg == 'dropout':
-            keep_prob = args[0]
-            self.sess.run(self.train_op, feed_dict={self.data_placeholder: feed_xs,
+            if keep_prob is None:
+                raise ValueError('need pass a keep_prob for run_step')
+            self.sess.run(self._train_op, feed_dict={self.data_placeholder: feed_xs,
                                                     self.target_placeholder: feed_ys,
                                                     self.keep_prob_placeholder: keep_prob})
         elif self.reg == 'l2':
-            l2 = args[0]
-            self.sess.run(self.train_op, feed_dict={self.data_placeholder: feed_xs,
+            if l2 is None:
+                raise ValueError('need pass a l2 for run_step')
+            self.sess.run(self._train_op, feed_dict={self.data_placeholder: feed_xs,
                                                     self.target_placeholder: feed_ys,
                                                     self.l2_placeholder: l2})
         else:
-            self.sess.run(self.train_op, feed_dict={self.data_placeholder: feed_xs,
+            self.sess.run(self._train_op, feed_dict={self.data_placeholder: feed_xs,
                                                     self.target_placeholder: feed_ys})
 
-    def fit(self, feed_xs, feed_ys, steps=5000, *args):
+    def fit(self, feed_xs, feed_ys, steps=2000, *args):
         """
         Fit data to network, automatically training the network.
         :param feed_xs:
@@ -301,9 +329,10 @@ class Network(object):
     def predict(self, xs):
         pass
 
-    def save(self, path='/tmp/'):
-        saver = tfnn.NetworkSaver()
-        saver.save(self, path)
+    def save(self, name='new_model', path=None, global_step=None):
+        if not hasattr(self, 'saver'):
+            self._saver = tfnn.NetworkSaver()
+        self._saver.save(self, name, path, global_step)
 
     def close(self):
         self.sess.close()
@@ -356,10 +385,29 @@ class Network(object):
 
         _input_size = self.layers_configs['neural_structure'].iloc[-1]['output_size']   # this is from last layer
         with tfnn.variable_scope(layer_name):
-            W = self._weight_variable([_input_size, n_neurons])
-            tfnn.histogram_summary(layer_name+'/weights', W)
-            b = self._bias_variable([n_neurons, ])
-            tfnn.histogram_summary(layer_name + '/biases', b)
+
+            with tfnn.variable_scope('weights') as weights_scope:
+                W = self._weight_variable([_input_size, n_neurons])
+                tfnn.histogram_summary(layer_name + '/weights', W)
+
+                # the image summary for visualizing filters
+                weights_scope.reuse_variables()
+                # weights shape [n_inputs, n_hidden_units]
+                weights = tfnn.get_variable('weights')
+                # scale weights to [0 255] and convert to uint8 (maybe change scaling?)
+                x_min = tfnn.reduce_min(weights)
+                x_max = tfnn.reduce_max(weights)
+                weights_0_to_1 = (weights - x_min) / (x_max - x_min)
+                weights_0_to_255_uint8 = tfnn.image.convert_image_dtype(weights_0_to_1, dtype=tfnn.uint8)
+                # to tf.image_summary format [batch_size, height, width, channels]
+                # (1, n_neurons, weights, 1)
+                W_expanded = tfnn.expand_dims(
+                    tfnn.expand_dims(weights_0_to_255_uint8, 0), 3)
+                tfnn.image_summary(layer_name + '/weights', W_expanded)
+
+            with tfnn.variable_scope('biases'):
+                b = self._bias_variable([n_neurons, ])
+                tfnn.histogram_summary(layer_name + '/biases', b)
 
             with tfnn.name_scope('Wx_plus_b'):
                 product = tfnn.add(tfnn.matmul(self.layers_results['final'].iloc[-1], W, name='Wx'),
@@ -398,18 +446,18 @@ class Network(object):
         self.Ws.set_value(label=len(self.Ws), value=W)
         self.bs.set_value(label=len(self.bs), value=b)
 
-    def _weight_variable(self, shape, initialize='truncated_normal'):
+    def _weight_variable(self, shape, initialize='truncated_normal', name='weights'):
         if initialize == 'truncated_normal':
             initializer = tfnn.truncated_normal_initializer(mean=0., stddev=0.3)
         elif initialize == 'random_normal':
             initializer = tfnn.random_normal_initializer(mean=0., stddev=0.3)
         else:
             raise ValueError('initializer not support %s' % initialize)
-        return tfnn.get_variable(name='weights', shape=shape, dtype=self.input_dtype,
+        return tfnn.get_variable(name=name, shape=shape, dtype=self.input_dtype,
                                  initializer=initializer, trainable=True,)
 
-    def _bias_variable(self, shape):
-        return tfnn.get_variable(name='biases', shape=shape, dtype=self.input_dtype,
+    def _bias_variable(self, shape, name='biases'):
+        return tfnn.get_variable(name=name, shape=shape, dtype=self.input_dtype,
                                  initializer=tfnn.constant_initializer(0.1),
                                  trainable=True)
 
