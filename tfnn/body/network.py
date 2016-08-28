@@ -72,9 +72,9 @@ class Network(object):
         """
         self._add_layer(n_neurons, activator, dropout_layer, name, layer_type='hidden')
 
-    def add_conv_layer(self, patch_x, patch_y, n_filters,
-                       activator=None, pool='max', dropout_layer=False,
-                       image_shape=None, name=None):
+    def add_conv_layer(self, patch_x, patch_y, n_filters, activator=None,
+                       strd=(1, 1), pool='max', pool_strd=(2, 2), pool_k=(2, 2),
+                       dropout_layer=False, image_shape=None, name=None):
         """
 
         :param patch_x:
@@ -87,24 +87,24 @@ class Network(object):
         :param name:
         :return:
         """
-        def conv2d(image, filters):
+        def conv2d(image, filters, strd=(1, 1)):
             # stride [1, x_movement, y_movement, 1]
             # Must have strides[0] = strides[3] = 1
             return tfnn.nn.conv2d(input=image, filter=filters,
-                                  strides=[1, 1, 1, 1], padding='SAME')
+                                  strides=[1, strd[0], strd[1], 1], padding='SAME')
 
-        def pool_2x2(image, layer_size, method='max', x_strides=2, y_strides=2):
+        def pool_2x2(image, layer_size, method='max', strd_x=2, strd_y=2, k_x=2, k_y=2):
             # stride [1, x_movement, y_movement, 1]
             if method == 'max':
-                result = tfnn.nn.max_pool(value=image, ksize=[1, 2, 2, 1],
-                                          strides=[1, x_strides, y_strides, 1], padding='SAME')
+                result = tfnn.nn.max_pool(value=image, ksize=[1, k_x, k_y, 1],
+                                          strides=[1, strd_x, strd_y, 1], padding='SAME')
             elif method == 'average':
-                result = tfnn.nn.avg_pool(value=image, ksize=[1, 2, 2, 1],
-                                          strides=[1, x_strides, y_strides, 1], padding='SAME')
+                result = tfnn.nn.avg_pool(value=image, ksize=[1, k_x, k_y, 1],
+                                          strides=[1, strd_x, strd_y, 1], padding='SAME')
             else:
                 raise ValueError('No method called %s' % method)
-            length = layer_size[0]/x_strides
-            width = layer_size[1]/y_strides
+            length = layer_size[0]/strd_x
+            width = layer_size[1]/strd_y
             features = layer_size[2]
             if not (type(length) == int) and (type(width) == int):
                 raise ValueError('pooling dimension error')
@@ -187,7 +187,8 @@ class Network(object):
                 tfnn.histogram_summary(layer_name + '/biases', b_conv)
 
             with tfnn.name_scope('Wx_plus_b'):
-                product = conv2d(self.layers_results['final'].iloc[-1], W_conv) + b_conv
+                product = conv2d(self.layers_results['final'].iloc[-1],
+                                 W_conv, strd) + b_conv
 
             if activator is not None:
                 activated_product = activator(product)  # output size 28x28x32
@@ -199,7 +200,9 @@ class Network(object):
             _out_size[-1] = n_filters
         # pooling process
         with tfnn.name_scope('pool'):
-            pooled_product, _out_size = pool_2x2(activated_product, _out_size, method=pool)
+            pooled_product, _out_size = pool_2x2(activated_product, _out_size, method=pool,
+                                                 strd_x=pool_strd[0], strd_y=pool_strd[1],
+                                                 k_x=pool_k[0], k_y=pool_k[1])
             tfnn.histogram_summary(layer_name + '/pooled_product', pooled_product)
 
         if (self.reg == 'dropout') and dropout_layer:
