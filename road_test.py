@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 def train(data_path, duration, save_to='/tmp/'):
     # load_data = pd.read_pickle(data_path).iloc[:10000, :]
     # xs = load_data.iloc[:, -60:]
-    l1_data = pd.read_pickle('I80_l1.pickle').dropna()
+    # l1_data = pd.read_pickle('I80_l1.pickle').dropna()
     load_data = pd.read_pickle(data_path).dropna()
-    load_data = pd.concat([load_data, l1_data], axis=0, ignore_index=True)
+    # load_data = pd.concat([load_data, l1_data], axis=0, ignore_index=True)
     # load_data = pd.read_csv(data_path, index_col=0).dropna()
     xs = pd.concat([load_data.iloc[:, -60-int(duration*10):-60],        # speed
                     load_data.iloc[:, -40-int(duration*10):-40],        # leader speed
@@ -27,7 +27,7 @@ def train(data_path, duration, save_to='/tmp/'):
     n_data = network.normalizer.minmax_fit(data)
     t_data, v_data = n_data.train_test_split(0.7)
     # the number of hidden unit is 2 * xs features
-    network.add_hidden_layer(xs.shape[1]*2, activator=tfnn.nn.relu, dropout_layer=True)
+    network.add_hidden_layer(xs.shape[1]*2, activator=tfnn.nn.tanh, dropout_layer=True)
     # network.add_hidden_layer(100, activator=tfnn.nn.relu, dropout_layer=True)
     network.add_output_layer(activator=None, dropout_layer=False)
     global_step = tfnn.Variable(0, trainable=False)
@@ -35,7 +35,7 @@ def train(data_path, duration, save_to='/tmp/'):
     optimizer = tfnn.train.AdamOptimizer(0.001)
     network.set_optimizer(optimizer, global_step)
     evaluator = tfnn.Evaluator(network)
-    summarizer = tfnn.Summarizer(network, save_path='/tmp/log')
+    summarizer = tfnn.Summarizer(network, save_path='/tmp/', include_test=True)
 
     for i in range(40000):
         b_xs, b_ys = t_data.next_batch(50, loop=True)
@@ -45,7 +45,7 @@ def train(data_path, duration, save_to='/tmp/'):
             summarizer.record_train(b_xs, b_ys, i, 0.5)
             summarizer.record_test(v_data.xs, v_data.ys, i)
             evaluator.regression_plot_linear_comparison(v_data.xs, v_data.ys, continue_plot=True)
-    network.save(path=save_to)
+    network.save(name=save_to)
     network.sess.close()
     summarizer.web_visualize()
 
@@ -361,15 +361,16 @@ if __name__ == '__main__':
     tfnn.set_random_seed(100)
     np.random.seed(101)
     path = 'I80_lane4.pickle'
+    path = 's3.pickle'
     duration = 1
     # path = r'/Users/MorvanZhou/Documents/python/2016_05_21_tfnn/road data/train_I80_lane_1_1s.pickle'
-    # train(path, duration, save_to='/model10/')
+    train(path, duration, save_to='/model10/')
     # compare_real(path, duration, model='/model10/')
     # test(duration, model='/model03/')
     # cross_validation(path)
 
     # 512, 517
-    traj_comp(path, duration, id=512, model='/model10/')
+    # traj_comp(path, duration, id=512, model='/model10/')
     # df = pd.read_pickle(path)
     # ids = np.unique(df.Vehicle_ID)
     # for id in ids:

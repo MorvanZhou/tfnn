@@ -104,7 +104,7 @@ class Evaluator(object):
         if self.first_time_soc:
             self.first_time_soc = False
             self.fig_soc, self.ax_soc = plt.subplots()
-            self.scat_soc = self.ax_soc.scatter(v_ys, predictions, label='predicted')
+            self.scat_soc = self.ax_soc.scatter(v_ys, predictions, label='predicted', alpha=0.5)
             self.ax_soc.plot([v_ys.min(), v_ys.max()], [v_ys.min(), v_ys.max()], 'r--', lw=4, label='real')
             self.ax_soc.grid(True)
             self.ax_soc.legend(loc='upper left')
@@ -119,7 +119,7 @@ class Evaluator(object):
         else:
             plt.pause(0.1)
             self.scat_soc.remove()
-            self.scat_soc = self.ax_soc.scatter(v_ys, predictions, label='predicted')
+            self.scat_soc = self.ax_soc.scatter(v_ys, predictions, label='predicted', alpha=0.5)
             plt.draw()
 
     def regression_plot_nonlinear_comparison(self, v_xs, v_ys, continue_plot=False):
@@ -150,8 +150,8 @@ class Evaluator(object):
         if self.first_time_lm:
             self.first_time_lm = False
             self.fig_lm, self.ax_lm = plt.subplots()
-            self.ax_lm.scatter(v_xs, v_ys, c='red', s=20)
-            self.scat_lm = self.ax_lm.scatter(v_xs, predictions, c='blue', s=20)
+            self.ax_lm.scatter(v_xs, v_ys, c='red', s=20, alpha=0.5)
+            self.scat_lm = self.ax_lm.scatter(v_xs, predictions, c='blue', s=20, alpha=0.5)
             self.ax_lm.set_xlabel('Input')
             self.ax_lm.set_ylabel('Output')
             if continue_plot:
@@ -160,6 +160,6 @@ class Evaluator(object):
         else:
             plt.pause(0.1)
             self.scat_lm.remove()
-            self.scat_lm = self.ax_lm.scatter(v_xs, predictions, c='blue', s=20)
+            self.scat_lm = self.ax_lm.scatter(v_xs, predictions, c='blue', s=20, alpha=0.5)
             plt.draw()
 
