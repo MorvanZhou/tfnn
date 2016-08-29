@@ -36,7 +36,11 @@ class NetworkSaver(object):
             raise NotADirectoryError('the directory is not exist: %s' % path)
 
         if os.path.isdir(save_path+name) and (not self._configs_saved):
-            raise FileExistsError('%s in %s already exists' % (name, save_path))
+            replace = input('%s in %s already exists, replace it? (y/n)' % (name, save_path))
+            if replace == 'y':
+                save_path = save_path + name
+            else:
+                raise FileExistsError('%s in %s already exists' % (name, save_path))
         else:
             save_path = save_path + name
         _saver = tfnn.train.Saver()

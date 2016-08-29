@@ -163,7 +163,7 @@ class Network(object):
 
                 # the image summary for visualizing filters
                 weights_scope.reuse_variables()
-                weights = tfnn.get_variable('weights')
+                weights = tfnn.get_variable('weights', trainable=False)
                 # scale weights to [0 255] and convert to uint8 (maybe change scaling?)
                 x_min = tfnn.reduce_min(weights)
                 x_max = tfnn.reduce_max(weights)
@@ -240,10 +240,19 @@ class Network(object):
 
     def set_optimizer(self, optimizer=None, global_step=None,):
         if optimizer is None:
-            optimizer = tfnn.train.GradientDescentOptimizer(0.01)
+            self._lr = 0.001
+            optimizer = tfnn.train.GradientDescentOptimizer(self._lr)
         if self.layers_configs['type'].iloc[-1] != 'output':
             raise NotImplementedError('Please add output layer.')
         with tfnn.name_scope('trian'):
+            if hasattr(optimizer, '_lr'):
+                self._lr = optimizer._lr
+            elif hasattr(optimizer, '_learning_rate'):
+                self._lr = optimizer._learning_rate
+            else:
+                raise AttributeError('this optimizer %s dose not have _lr ot _learning rate'
+                                     % optimizer._name)
+            tfnn.scalar_summary('learning_rate', self._lr)
             self._train_op = optimizer.minimize(self.loss, global_step, name='train_op')
         self.sess = tfnn.Session()
 
@@ -396,7 +405,7 @@ class Network(object):
                 # the image summary for visualizing filters
                 weights_scope.reuse_variables()
                 # weights shape [n_inputs, n_hidden_units]
-                weights = tfnn.get_variable('weights')
+                weights = tfnn.get_variable('weights', trainable=False)
                 # scale weights to [0 255] and convert to uint8 (maybe change scaling?)
                 x_min = tfnn.reduce_min(weights)
                 x_max = tfnn.reduce_max(weights)
