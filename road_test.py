@@ -7,10 +7,12 @@ import matplotlib.pyplot as plt
 def train(data_path, duration, save_to='/tmp/'):
     # load_data = pd.read_pickle(data_path).iloc[:10000, :]
     # xs = load_data.iloc[:, -60:]
-    # l1_data = pd.read_pickle('I80_l1.pickle').dropna()
-    load_data = pd.read_pickle(data_path).dropna()
-    # load_data = pd.concat([load_data, l1_data], axis=0, ignore_index=True)
     # load_data = pd.read_csv(data_path, index_col=0).dropna()
+
+    load_data = pd.DataFrame()
+    for lane_path in data_path:
+        lane_data = pd.read_pickle(lane_path).dropna()
+        load_data = pd.concat([load_data, lane_data], axis=0, ignore_index=True)
     xs = pd.concat([load_data.iloc[:, -60-int(duration*10):-60],        # speed
                     load_data.iloc[:, -40-int(duration*10):-40],        # leader speed
                     load_data.iloc[:, -20-int(duration*10):-20]],        # spacing
@@ -25,14 +27,15 @@ def train(data_path, duration, save_to='/tmp/'):
 
     network = tfnn.RegNetwork(xs.shape[1], 1, do_dropout=False)
     n_data = network.normalizer.minmax_fit(data)
-    t_data, v_data = n_data.train_test_split(0.7)
+    t_data, v_data = n_data.train_test_split(0.9)
     # the number of hidden unit is 2 * xs features
-    network.add_hidden_layer(xs.shape[1]*2, activator=tfnn.nn.tanh, dropout_layer=True)
-    # network.add_hidden_layer(100, activator=tfnn.nn.relu, dropout_layer=True)
+    network.add_hidden_layer(100, activator=tfnn.nn.tanh, dropout_layer=True)
+    network.add_hidden_layer(100, activator=tfnn.nn.tanh, dropout_layer=True)
+    network.add_hidden_layer(10, activator=tfnn.nn.tanh, dropout_layer=True)
     network.add_output_layer(activator=None, dropout_layer=False)
     global_step = tfnn.Variable(0, trainable=False)
-    # lr = tfnn.train.exponential_decay(0.001, global_step, 2000, 0.9)
-    optimizer = tfnn.train.AdamOptimizer(0.001)
+    lr = tfnn.train.exponential_decay(0.001, global_step, 2000, 0.9, staircase=False)
+    optimizer = tfnn.train.AdamOptimizer(lr)
     network.set_optimizer(optimizer, global_step)
     evaluator = tfnn.Evaluator(network)
     summarizer = tfnn.Summarizer(network, save_path='/tmp/', include_test=True)
@@ -45,17 +48,17 @@ def train(data_path, duration, save_to='/tmp/'):
             summarizer.record_train(b_xs, b_ys, i, 0.5)
             summarizer.record_test(v_data.xs, v_data.ys, i)
             evaluator.regression_plot_linear_comparison(v_data.xs, v_data.ys, continue_plot=True)
-    network.save(name=save_to)
+    network.save(path='tmp', name=save_to)
     network.sess.close()
     summarizer.web_visualize()
 
 
-def compare_real(path, duration, model='/tmp/'):
+def compare_real(path, duration, model_path='tmp', model='/model'):
     # load_data = pd.read_pickle(data_path)
     load_data = pd.read_pickle(path).dropna().iloc[-10000:, :]
     # load_data = pd.read_csv(path, index_col=0).dropna()
-    s = 9110
-    f = s + 300
+    s = 8000
+    f = s + 1000
     # xs = load_data.iloc[s:f, -60:]
     xs = pd.concat([load_data.iloc[s:f, -60 - int(duration*10):-60],    # speed
                     load_data.iloc[s:f, -40 - int(duration*10):-40],    # leader speed
@@ -66,7 +69,7 @@ def compare_real(path, duration, model='/tmp/'):
     # ys = load_data.a[s:f]
     network_saver = tfnn.NetworkSaver()
     plt.plot(np.arange(xs.shape[0]), ys, 'k-', label='real')
-    network = network_saver.restore(model)
+    network = network_saver.restore(name=model, path=model_path)
     prediction = network.predict(network.normalizer.fit_transform(xs))
     plt.plot(np.arange(xs.shape[0]), prediction, 'r--', label='predicted')
     network.sess.close()
@@ -97,10 +100,9 @@ class Car:
         self.ss = [15]
 
 
-def test(duration, model='/tmp/'):
+def test(duration, model_path='tmp', model='/model'):
     network_saver = tfnn.NetworkSaver()
-    restore_path = model
-    network = network_saver.restore(restore_path)
+    network = network_saver.restore(name=model, path=model_path)
     test_time = 60
     duration = int(10 * duration)
     cars = []
@@ -193,84 +195,149 @@ def test(duration, model='/tmp/'):
     plt.show()
 
 
-def traj_comp(path, duration, id, model):
+def traj_comp(path, duration, id,  model_path='tmp', model='/model'):
     df = pd.read_pickle(path)
 
-    # vehicle = df[df.Vehicle_ID == id]
-    # plt.plot(vehicle.Frame_ID, vehicle.filter_position, c='r', label=id)
-    # p_vehicle = vehicle
-    # for _ in range(6):
-    #     p_id = p_vehicle.Vehicle_ID.iloc[0]
-    #     followers = (df[df.Preceding_Vehicle == p_id]).Vehicle_ID.unique()
-    #     for follower_id in followers:
-    #         follower = df[df.Vehicle_ID == follower_id]
-    #         plt.plot(follower.Frame_ID, follower.filter_position, label=follower_id)
-    #     p_vehicle = df[df.Vehicle_ID == followers[0]]
-    # plt.legend()
+    vehicle = df[df.Vehicle_ID == id]
+    plt.plot(vehicle.Frame_ID, vehicle.filter_position, c='r', label=id)
+    p_vehicle = vehicle
+    for _ in range(40):
+        p_id = p_vehicle.Vehicle_ID.iloc[0]
+        followers = (df[df.Preceding_Vehicle == p_id]).Vehicle_ID.unique()
+        for follower_id in followers:
+            follower = df[df.Vehicle_ID == follower_id]
+            plt.plot(follower.Frame_ID, follower.filter_position, label=follower_id)
+        p_vehicle = df[df.Vehicle_ID == followers[0]]
+    plt.legend()
+    plt.show()
+
+
+    # car_517 = df[df.Vehicle_ID == 517].loc[:, ['Frame_ID', 'filter_position', 'deri_v']].dropna()
+    # car_514 = df[df.Vehicle_ID == 514].loc[:, ['Frame_ID', 'filter_position', 'deri_v']].dropna()
+    # car_522 = df[df.Vehicle_ID == 522].loc[:, ['Frame_ID', 'filter_position', 'deri_v']].dropna()
+    # car_525 = df[df.Vehicle_ID == 525].loc[:, ['Frame_ID', 'filter_position', 'deri_v']].dropna()
+    # start_point = 1911
+    # # combine car 517 and 514 as the leader for machine learning
+    # leader = pd.concat([car_517[car_517.Frame_ID < 2102], car_514], axis=0)
+    # leader = leader[leader.Frame_ID >= start_point]
+    #
+    # # filter car 522 to the same start point as the leader
+    # car_522 = car_522[car_522.Frame_ID >= start_point]
+    # car_525 = car_525[car_525.Frame_ID >= start_point]
+    #
+    # plt.plot(car_517.Frame_ID, car_517.filter_position, label=517)
+    # plt.plot(car_514.Frame_ID, car_514.filter_position, label=514)
+    # # plt.plot(leader.Frame_ID, leader.filter_position, label='leader')
+    # plt.plot(car_522.Frame_ID, car_522.filter_position, label=522)
+    # plt.plot(car_525.Frame_ID, car_525.filter_position, label=525)
+    #
+    #
+    # network_saver = tfnn.NetworkSaver()
+    # network = network_saver.restore(name=model, path=model_path)
+    #
+    # tested_vehicle1 = car_522.iloc[:int(duration*10), :]
+    # position1 = car_522.filter_position.iloc[int(duration*10)-1]
+    # speed1 = car_522.deri_v.iloc[int(duration*10)-1]
+    #
+    # tested_vehicle2 = car_525.iloc[:int(duration * 10), :]
+    # position2 = car_525.filter_position.iloc[int(duration * 10) - 1]
+    # speed2 = car_525.deri_v.iloc[int(duration * 10) - 1]
+    #
+    # tested_vehicles = [tested_vehicle1, tested_vehicle2]
+    # positions = [position1, position2]
+    # speeds = [speed1, speed2]
+    # leaders = [leader, tested_vehicle1]
+    #
+    # for index in range(int(duration*10), len(leader)):
+    #     for t_car in range(2):
+    #         if t_car == 1:
+    #             leaders[1] = tested_vehicles[0]
+    #         v_data = tested_vehicles[t_car].deri_v.iloc[index-int(duration*10): index]
+    #         v_l_data = leaders[t_car].deri_v.iloc[index-int(duration*10): index]
+    #         dx_data = pd.Series(leaders[t_car].filter_position.iloc[index-int(duration*10): index].values \
+    #                   - tested_vehicles[t_car].filter_position.iloc[index-int(duration*10): index].values)
+    #         xs_data = v_data.append([v_l_data, dx_data]).reset_index(drop=True)
+    #         a = network.predict(network.normalizer.fit_transform(xs_data))
+    #         positions[t_car] += 1/2*a*0.1**2 + v_data.iloc[-1]*0.1
+    #         speeds[t_car] += a*0.1
+    #         f_id = leader.Frame_ID.iloc[index]
+    #         tested_vehicles[t_car] = pd.concat([tested_vehicles[t_car],
+    #                                     pd.DataFrame([[f_id, positions[t_car], speeds[t_car]]],
+    #                                                  columns=tested_vehicle1.columns)],
+    #                                    axis=0,
+    #                                    ignore_index=True)
+    #
+    # for t_car, c_id in zip(range(2), [522, 525]):
+    #     plt.plot(tested_vehicles[t_car].Frame_ID, tested_vehicles[t_car].filter_position, 'k--', label='test%s' % c_id)
+    # plt.legend(loc='best')
     # plt.show()
+    # # print(follower.loc[:, ['Vehicle_ID', 'Frame_ID', 'filter_position']])
 
+def oscillation(path, duration, id,  model_path='tmp', model='/model'):
+    df = pd.read_pickle(path)[['filter_position', 'Vehicle_ID', 'Frame_ID', 'deri_v']].dropna()
+    df = df[df['filter_position'] >= 280]
+    df = df[df['Frame_ID'] < 3000]
+    leader = df[df['Vehicle_ID'] == id]
+    ids = np.unique(df.Vehicle_ID)
+    filter_ids = ids[ids >= id]
+    positions = pd.DataFrame(index=range(1400, 2200))
+    speeds = pd.DataFrame(index=range(1400, 2200))
+    for i, car_id in enumerate(filter_ids):
+        if i > 20:
+            break
+        car_data = df[df['Vehicle_ID'] == car_id]
+        car_data = car_data.set_index(['Frame_ID'])
+        car_position = car_data['filter_position']
+        car_speed = car_data['deri_v']
+        positions = pd.concat([positions, car_position], axis=1)
+        speeds = pd.concat([speeds, car_speed.rename(i)], axis=1)
 
-    car_517 = df[df.Vehicle_ID == 517].loc[:, ['Frame_ID', 'filter_position', 'deri_v']].dropna()
-    car_514 = df[df.Vehicle_ID == 514].loc[:, ['Frame_ID', 'filter_position', 'deri_v']].dropna()
-    car_522 = df[df.Vehicle_ID == 522].loc[:, ['Frame_ID', 'filter_position', 'deri_v']].dropna()
-    car_525 = df[df.Vehicle_ID == 525].loc[:, ['Frame_ID', 'filter_position', 'deri_v']].dropna()
-    start_point = 1911
-    # combine car 517 and 514 as the leader for machine learning
-    leader = pd.concat([car_517[car_517.Frame_ID < 2102], car_514], axis=0)
-    leader = leader[leader.Frame_ID >= start_point]
+    plt.plot(positions)
+    plt.show()
 
-    # filter car 522 to the same start point as the leader
-    car_522 = car_522[car_522.Frame_ID >= start_point]
-    car_525 = car_525[car_525.Frame_ID >= start_point]
+    positions.columns = range(21)
+    end_f_ids = positions.idxmax(axis=0)
+    positions = positions[positions < 350]
+    positions = positions[positions.max().dropna().index]
+    end_f_ids = end_f_ids[positions.max().dropna().index]
+    positions.columns = range(19)
+    end_f_ids.index = range(19)
+    start_f_ids = positions.idxmin(axis=0)
+    start_ps = pd.DataFrame()
+    start_vs = pd.DataFrame()
 
-    plt.plot(car_517.Frame_ID, car_517.filter_position, label=517)
-    plt.plot(car_514.Frame_ID, car_514.filter_position, label=514)
-    # plt.plot(leader.Frame_ID, leader.filter_position, label='leader')
-    plt.plot(car_522.Frame_ID, car_522.filter_position, label=522)
-    plt.plot(car_525.Frame_ID, car_525.filter_position, label=525)
-
+    for i, f_id in enumerate(start_f_ids):
+        if i == 0:
+            start_p = df.loc[:, ['filter_position', 'Frame_ID']][df['Vehicle_ID'] == id].set_index('Frame_ID')
+            start_v = df.loc[:, ['deri_v', 'Frame_ID']][df['Vehicle_ID'] == id].set_index('Frame_ID')
+        else:
+            start_p = positions.loc[f_id:f_id+int(duration*10), i]
+            start_v = speeds.loc[f_id: f_id + int(duration * 10), i]
+        start_ps = pd.concat([start_ps, start_p], axis=1, ignore_index=True)
+        start_vs = pd.concat([start_vs, start_v], axis=1, ignore_index=True)
 
     network_saver = tfnn.NetworkSaver()
-    restore_path = model
-    network = network_saver.restore(restore_path)
+    network = network_saver.restore(name=model, path=model_path)
 
-    tested_vehicle1 = car_522.iloc[:int(duration*10), :]
-    position1 = car_522.filter_position.iloc[int(duration*10)-1]
-    speed1 = car_522.deri_v.iloc[int(duration*10)-1]
+    for i in range(1, 19):
+        for t in range(int(start_f_ids.iloc[i]+int(duration*10)), int(end_f_ids.iloc[i])):
+            speed = start_vs.loc[t-int(duration*10)+1: t, i]
+            leader_speed = start_vs.loc[t-int(duration*10)+1: t, i-1]
+            p = start_ps.loc[t-int(duration*10)+1: t, i]
+            leader_p = start_ps.loc[t-int(duration*10)+1: t, i-1]
+            dx = leader_p - p
+            # speed, leader speed, dx
+            # [furthest, nearest]
+            input_data = pd.concat([speed, leader_speed, dx])
+            if len(input_data) > 30:
+                pass
+            a = network.predict(network.normalizer.fit_transform(input_data))
+            start_ps.loc[t+1, i] = start_ps.loc[t, i] + speed.iloc[-1]*0.1 + 1/2*a*0.1**2
+            start_vs.loc[t+1, i] = start_vs.loc[t, i] + a*0.1
+        plt.plot(start_ps)
+        plt.show()
 
-    tested_vehicle2 = car_525.iloc[:int(duration * 10), :]
-    position2 = car_525.filter_position.iloc[int(duration * 10) - 1]
-    speed2 = car_525.deri_v.iloc[int(duration * 10) - 1]
 
-    tested_vehicles = [tested_vehicle1, tested_vehicle2]
-    positions = [position1, position2]
-    speeds = [speed1, speed2]
-    leaders = [leader, tested_vehicle1]
-
-    for index in range(int(duration*10), len(leader)):
-        for t_car in range(2):
-            if t_car == 1:
-                leaders[1] = tested_vehicles[0]
-            v_data = tested_vehicles[t_car].deri_v.iloc[index-int(duration*10): index]
-            v_l_data = leaders[t_car].deri_v.iloc[index-int(duration*10): index]
-            dx_data = pd.Series(leaders[t_car].filter_position.iloc[index-int(duration*10): index].values \
-                      - tested_vehicles[t_car].filter_position.iloc[index-int(duration*10): index].values)
-            xs_data = v_data.append([v_l_data, dx_data]).reset_index(drop=True)
-            a = network.predict(network.normalizer.fit_transform(xs_data))
-            positions[t_car] += 1/2*a*0.1**2 + v_data.iloc[-1]*0.1
-            speeds[t_car] += a*0.1
-            f_id = leader.Frame_ID.iloc[index]
-            tested_vehicles[t_car] = pd.concat([tested_vehicles[t_car],
-                                        pd.DataFrame([[f_id, positions[t_car], speeds[t_car]]],
-                                                     columns=tested_vehicle1.columns)],
-                                       axis=0,
-                                       ignore_index=True)
-
-    for t_car, c_id in zip(range(2), [522, 525]):
-        plt.plot(tested_vehicles[t_car].Frame_ID, tested_vehicles[t_car].filter_position, 'k--', label='test%s' % c_id)
-    plt.legend(loc='best')
-    plt.show()
-    # print(follower.loc[:, ['Vehicle_ID', 'Frame_ID', 'filter_position']])
 
 
 
@@ -360,19 +427,25 @@ def cross_validation(path):
 if __name__ == '__main__':
     tfnn.set_random_seed(100)
     np.random.seed(101)
-    path = 'I80_lane4.pickle'
-    path = 's3.pickle'
+    which_lane = [1, 2, 3]
+    path = ['datasets/I80-0400_lane%i.pickle' % lane for lane in which_lane]
+    # path = 's3.pickle'
     duration = 1
-    # path = r'/Users/MorvanZhou/Documents/python/2016_05_21_tfnn/road data/train_I80_lane_1_1s.pickle'
-    train(path, duration, save_to='/model10/')
-    # compare_real(path, duration, model='/model10/')
-    # test(duration, model='/model03/')
+    # train(path, duration, save_to='/model%i/' % int(duration*10))
+
+    test_path = 'datasets/I80-0400_lane2.pickle'
+    # compare_real(test_path, duration, model_path='tmp', model='/model%i/' % int(duration*10))
+
+    # test(duration,  model_path='tmp', model='/model%i/' % int(duration*10))
+
     # cross_validation(path)
 
-    # 512, 517
-    # traj_comp(path, duration, id=512, model='/model10/')
-    # df = pd.read_pickle(path)
+    # 512, 517, 418, 121, 191, 242, 392
+    lane4_path = 'datasets/I80-0400_lane4.pickle'
+    # traj_comp(lane4_path, duration, id=418,  model_path='tmp', model='/model%i/' % int(duration*10))
+    # df = pd.read_pickle(lane4_path)
     # ids = np.unique(df.Vehicle_ID)
     # for id in ids:
     #     print(id)
-    #     traj_comp(path, duration, id)
+    #     traj_comp(lane4_path, duration, id, model_path='tmp', model='/model%i/' % int(duration*10))
+    oscillation(lane4_path, duration, id=418, model='model10', model_path='tmp')
