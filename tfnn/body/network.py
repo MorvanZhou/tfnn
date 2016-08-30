@@ -341,10 +341,10 @@ class Network(object):
     def predict(self, xs):
         pass
 
-    def save(self, name='new_model', path=None, global_step=None):
+    def save(self, name='new_model', path=None, global_step=None, replace=False):
         if not hasattr(self, 'saver'):
             self._saver = tfnn.NetworkSaver()
-        self._saver.save(self, name, path, global_step)
+        self._saver.save(self, name, path, global_step, replace=replace)
 
     def close(self):
         self.sess.close()

@@ -11,7 +11,7 @@ class NetworkSaver(object):
         self._configs_saved = False
         self._available_checkpoints = []
 
-    def save(self, network, name='new_model', path=None, global_step=None):
+    def save(self, network, name='new_model', path=None, global_step=None, replace=False):
         """
         save network config and normalized data config
         :param network: trained network
@@ -36,11 +36,14 @@ class NetworkSaver(object):
             raise NotADirectoryError('the directory is not exist: %s' % path)
 
         if os.path.isdir(save_path+name) and (not self._configs_saved):
-            replace = input('%s in %s already exists, replace it? (y/n)' % (name, save_path))
-            if replace == 'y':
+            if replace:
                 save_path = save_path + name
             else:
-                raise FileExistsError('%s in %s already exists' % (name, save_path))
+                replace_answer = input('%s in %s already exists, replace it? (y/n)' % (name, save_path))
+                if replace_answer == 'y':
+                    save_path = save_path + name
+                else:
+                    raise FileExistsError('%s in %s already exists' % (name, save_path))
         else:
             save_path = save_path + name
         _saver = tfnn.train.Saver()
