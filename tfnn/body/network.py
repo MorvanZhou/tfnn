@@ -459,10 +459,12 @@ class Network(object):
         self.bs.set_value(label=len(self.bs), value=b)
 
     def _weight_variable(self, shape, initialize='truncated_normal', name='weights'):
+        # using a standard deviation of 1/sqrt(N), where N is the number of inputs to the given neuron layer.
+        # stddev=1./np.sqrt(shape[0])
         if initialize == 'truncated_normal':
-            initializer = tfnn.truncated_normal_initializer(mean=0., stddev=0.3)
+            initializer = tfnn.truncated_normal_initializer(mean=0., stddev=1./np.sqrt(shape[0]))
         elif initialize == 'random_normal':
-            initializer = tfnn.random_normal_initializer(mean=0., stddev=0.3)
+            initializer = tfnn.random_normal_initializer(mean=0., stddev=1./np.sqrt(shape[0]))
         else:
             raise ValueError('initializer not support %s' % initialize)
         return tfnn.get_variable(name=name, shape=shape, dtype=self.input_dtype,

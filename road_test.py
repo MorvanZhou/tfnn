@@ -27,20 +27,19 @@ def train(data_path, duration, save_to='/tmp/'):
 
     network = tfnn.RegNetwork(xs.shape[1], 1, do_dropout=False)
     n_data = network.normalizer.minmax_fit(data)
-    t_data, v_data = n_data.train_test_split(0.9)
+    t_data, v_data = n_data.train_test_split(0.8)
     # the number of hidden unit is 2 * xs features
-    network.add_hidden_layer(100, activator=tfnn.nn.tanh, dropout_layer=True)
-    network.add_hidden_layer(100, activator=tfnn.nn.tanh, dropout_layer=True)
-    network.add_hidden_layer(10, activator=tfnn.nn.tanh, dropout_layer=True)
+    network.add_hidden_layer(4*xs.shape[1], activator=tfnn.nn.relu, dropout_layer=True)
+    network.add_hidden_layer(20, activator=tfnn.nn.relu, dropout_layer=True)
     network.add_output_layer(activator=None, dropout_layer=False)
     global_step = tfnn.Variable(0, trainable=False)
-    lr = tfnn.train.exponential_decay(0.001, global_step, 2000, 0.9, staircase=False)
-    optimizer = tfnn.train.AdamOptimizer(lr)
+    # lr = tfnn.train.exponential_decay(0.001, global_step, 1000, 0.9, staircase=False)
+    optimizer = tfnn.train.AdamOptimizer(0.001)
     network.set_optimizer(optimizer, global_step)
     evaluator = tfnn.Evaluator(network)
     summarizer = tfnn.Summarizer(network, save_path='/tmp/', include_test=True)
 
-    for i in range(40000):
+    for i in range(20000):
         b_xs, b_ys = t_data.next_batch(50, loop=True)
         network.run_step(b_xs, b_ys, 0.5)
         if i % 1000 == 0:
@@ -274,71 +273,76 @@ def traj_comp(path, duration, id,  model_path='tmp', model='/model'):
     # # print(follower.loc[:, ['Vehicle_ID', 'Frame_ID', 'filter_position']])
 
 def oscillation(path, duration, id,  model_path='tmp', model='/model'):
+    np.random.seed(11)
     df = pd.read_pickle(path)[['filter_position', 'Vehicle_ID', 'Frame_ID', 'deri_v']].dropna()
-    df = df[df['filter_position'] >= 280]
-    df = df[df['Frame_ID'] < 3000]
+    all_speed = df['deri_v'][(df['filter_position']>=100) & (df['filter_position']<=300)]
+    speed_mean = all_speed.mean()
+    speed_std = all_speed.std()
+    df = df[df['filter_position'] >= 50]
+    # df = df[df['Frame_ID'] < 3000]
     leader = df[df['Vehicle_ID'] == id]
     ids = np.unique(df.Vehicle_ID)
     filter_ids = ids[ids >= id]
-    positions = pd.DataFrame(index=range(1400, 2200))
-    speeds = pd.DataFrame(index=range(1400, 2200))
+    positions = pd.DataFrame(index=range(1800, 2800))
     for i, car_id in enumerate(filter_ids):
-        if i > 20:
+        if i > 10:
             break
         car_data = df[df['Vehicle_ID'] == car_id]
         car_data = car_data.set_index(['Frame_ID'])
         car_position = car_data['filter_position']
-        car_speed = car_data['deri_v']
         positions = pd.concat([positions, car_position], axis=1)
-        speeds = pd.concat([speeds, car_speed.rename(i)], axis=1)
 
-    plt.plot(positions)
-    plt.show()
-
-    positions.columns = range(21)
-    end_f_ids = positions.idxmax(axis=0)
-    positions = positions[positions < 350]
-    positions = positions[positions.max().dropna().index]
-    end_f_ids = end_f_ids[positions.max().dropna().index]
-    positions.columns = range(19)
-    end_f_ids.index = range(19)
-    start_f_ids = positions.idxmin(axis=0)
-    start_ps = pd.DataFrame()
-    start_vs = pd.DataFrame()
-
-    for i, f_id in enumerate(start_f_ids):
-        if i == 0:
-            start_p = df.loc[:, ['filter_position', 'Frame_ID']][df['Vehicle_ID'] == id].set_index('Frame_ID')
-            start_v = df.loc[:, ['deri_v', 'Frame_ID']][df['Vehicle_ID'] == id].set_index('Frame_ID')
-        else:
-            start_p = positions.loc[f_id:f_id+int(duration*10), i]
-            start_v = speeds.loc[f_id: f_id + int(duration * 10), i]
-        start_ps = pd.concat([start_ps, start_p], axis=1, ignore_index=True)
-        start_vs = pd.concat([start_vs, start_v], axis=1, ignore_index=True)
+    # plt.plot(positions)
+    # plt.show()
 
     network_saver = tfnn.NetworkSaver()
     network = network_saver.restore(name=model, path=model_path)
 
-    for i in range(1, 19):
-        for t in range(int(start_f_ids.iloc[i]+int(duration*10)), int(end_f_ids.iloc[i])):
-            speed = start_vs.loc[t-int(duration*10)+1: t, i]
-            leader_speed = start_vs.loc[t-int(duration*10)+1: t, i-1]
-            p = start_ps.loc[t-int(duration*10)+1: t, i]
-            leader_p = start_ps.loc[t-int(duration*10)+1: t, i-1]
-            dx = leader_p - p
-            # speed, leader speed, dx
+    all_dx = positions.diff(axis=1).stack()
+    dx_mean = all_dx.mean()
+    dx_std = all_dx.std()
+    all_speeds = pd.DataFrame()
+    all_speeds = pd.concat([all_speeds, leader['deri_v'].dropna().rename(0)], axis=1)
+    leader_speed_append = all_speeds.iloc[-1, 0] * pd.Series(np.ones(400))
+    all_speeds = pd.concat([all_speeds, leader_speed_append], axis=0).reset_index(drop=True)
+
+    all_ps = pd.DataFrame()
+    all_ps = pd.concat([all_ps, leader['filter_position'].dropna().rename(0)], axis=1)
+    position_change = all_speeds.iloc[-1, 0] * 0.1
+    leader_position_append = all_ps.iloc[-1, 0] + position_change * pd.Series(np.arange(1, 401))
+    all_ps = pd.concat([all_ps, leader_position_append], axis=0).reset_index(drop=True)
+    for i in range(1, 10):
+        distance_noise = (np.random.normal(dx_mean, dx_std))
+        distance_noise = np.min([-10, distance_noise])
+        distance_noise = np.max([-30, distance_noise])
+        individual_p = all_ps.iloc[:int(duration*10), i-1] + distance_noise
+        all_ps = pd.concat([all_ps, individual_p.rename(i)], axis=1)
+        speed_noise = (np.random.normal(speed_mean, speed_std))
+        speed_noise = np.max([5, speed_noise])
+        speed_noise = np.min([20, speed_noise])
+        individual_speed = pd.DataFrame(np.zeros((int(duration*10), 1)) + speed_noise,
+                                        columns=[i])
+        all_speeds = pd.concat([all_speeds, individual_speed], axis=1, ignore_index=True)
+
+        for t in range(int(duration*10), all_ps.shape[0]-1):
+
+            # speed, leader speed, dx, dv
             # [furthest, nearest]
-            input_data = pd.concat([speed, leader_speed, dx])
-            if len(input_data) > 30:
-                pass
+            v = all_speeds.iloc[t-int(duration*10): t, i]
+            v_l = all_speeds.iloc[t-int(duration*10): t, i-1]
+            dx = all_ps.iloc[t-int(duration*10): t, i-1] - all_ps.iloc[t-int(duration*10): t, i]
+            # dv = v_l - v
+            input_data = pd.concat([v, v_l, dx])
             a = network.predict(network.normalizer.fit_transform(input_data))
-            start_ps.loc[t+1, i] = start_ps.loc[t, i] + speed.iloc[-1]*0.1 + 1/2*a*0.1**2
-            start_vs.loc[t+1, i] = start_vs.loc[t, i] + a*0.1
-        plt.plot(start_ps)
-        plt.show()
+            new_speed = all_speeds.iloc[t-1, i] + a * 0.1
+            new_speed = 0 if new_speed < 0 else new_speed
+            all_ps.iloc[t, i] = all_ps.iloc[t-1, i] + (all_speeds.iloc[t-1, i]+new_speed)/2*0.1
+            all_speeds.iloc[t, i] = new_speed
 
-
-
+    plt.plot(all_ps,)
+    plt.ylim((50, 500))
+    plt.xlim((0, 800))
+    plt.show()
 
 
 def cross_validation(path):
@@ -426,14 +430,13 @@ def cross_validation(path):
 
 if __name__ == '__main__':
     tfnn.set_random_seed(100)
-    np.random.seed(101)
-    which_lane = [1, 2, 3]
+    np.random.seed(1001)
+    which_lane = [2, 3]
     path = ['datasets/I80-0400_lane%i.pickle' % lane for lane in which_lane]
-    # path = 's3.pickle'
     duration = 1
     # train(path, duration, save_to='/model%i/' % int(duration*10))
 
-    test_path = 'datasets/I80-0400_lane2.pickle'
+    # test_path = 'datasets/I80-0400_lane4.pickle'
     # compare_real(test_path, duration, model_path='tmp', model='/model%i/' % int(duration*10))
 
     # test(duration,  model_path='tmp', model='/model%i/' % int(duration*10))
@@ -441,11 +444,12 @@ if __name__ == '__main__':
     # cross_validation(path)
 
     # 512, 517, 418, 121, 191, 242, 392
-    lane4_path = 'datasets/I80-0400_lane4.pickle'
-    # traj_comp(lane4_path, duration, id=418,  model_path='tmp', model='/model%i/' % int(duration*10))
+    lane4_path = 'datasets/I80-0400_lane2.pickle'
+    # traj_comp(lane4_path, duration, id=857,  model_path='tmp', model='/model%i/' % int(duration*10))
     # df = pd.read_pickle(lane4_path)
     # ids = np.unique(df.Vehicle_ID)
+    # print(ids)
     # for id in ids:
     #     print(id)
     #     traj_comp(lane4_path, duration, id, model_path='tmp', model='/model%i/' % int(duration*10))
-    oscillation(lane4_path, duration, id=418, model='model10', model_path='tmp')
+    oscillation(lane4_path, duration, id=890, model='/model%i/' % int(duration*10), model_path='tmp')

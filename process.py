@@ -48,5 +48,5 @@ def select_lane(path, lane=1):
     lane_data.to_pickle(path[:17]+'_lane%s.pickle' % lane)
 
 if __name__ == '__main__':
-    path = 'datasets/I80-0400-0415-filter_0.8_T_v_ldxdvh.pickle'
-    select_lane(path, lane=2)
+    path = 'datasets/I80-0500-0515-filter_0.8_T_v_ldxdvh.pickle'
+    select_lane(path, lane=3)

@@ -155,7 +155,7 @@ def batch_filter(path, T=0.8, selected_filter='f_x', save=True, clip_bound=None)
     # data.dropna(how='any', inplace=True)
     # print(data.head())
     if save:
-        extract_v_l_dx_dv_h(c_data, save=True)
+        extract_v_l_dx_dv_h(path[:22] + '-filter_%s_T.pickle' % str(T), save=True)
     else:
         return c_data
 
@@ -294,8 +294,8 @@ def extract_v_l_dx_dv_h(path, save=False):
 
 
 if __name__ == '__main__':
-    # path = 'datasets/I80-0400-0415.txt'
-    # extract(path=path)
+    path = 'datasets/I80-0500-0515.txt'
+    extract(path=path)
 
     # select 3000-3300 car example
     # data = pd.read_pickle('datasets/I80-0400-0415.pickle').iloc[1096646:1236558, :]
@@ -303,7 +303,7 @@ if __name__ == '__main__':
     # filter_x(data, alpha=17, T=1.5)
     # filter_x_v_a(data, 4)
 
-    path = 'datasets/I80-0400-0415.pickle'
+    path = 'datasets/I80-0500-0515.pickle'
     batch_filter(path, T=0.8, selected_filter='f_x', clip_bound=(-3.41376, 3.41376), save=True)
 
     # path = 'datasets/I80-0400-0415-filter.pickle'
