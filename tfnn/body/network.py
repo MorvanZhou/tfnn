@@ -48,7 +48,8 @@ class Network(object):
         self.Ws = pd.Series([])
         self.bs = pd.Series([])
 
-    def add_fc_layer(self, n_neurons, activator=None, dropout_layer=False, name=None):
+    def add_fc_layer(self, n_neurons, activator=None, dropout_layer=False, name=None,
+                     w_initial='xavier'):
         if self.layers_configs['type'].iloc[-1] == 'conv':
             conv_shape = self.layers_configs['neural_structure'].iloc[-1]['output_size']
             flat_shape = conv_shape[0] * conv_shape[1] * conv_shape[2]
@@ -59,9 +60,11 @@ class Network(object):
                 [-1, flat_shape], name='flat4fc')
             self.layers_results['final'].iloc[-1] = flat_result
 
-        self._add_layer(n_neurons, activator, dropout_layer, name, layer_type='fc')
+        self._add_layer(n_neurons, activator, dropout_layer, name, w_initial,
+                        layer_type='fc')
 
-    def add_hidden_layer(self, n_neurons, activator=None, dropout_layer=False, name=None):
+    def add_hidden_layer(self, n_neurons, activator=None, dropout_layer=False, name=None,
+                         w_initial='xavier'):
         """
         For original or simple neural network.
         :param n_neurons:
@@ -70,11 +73,12 @@ class Network(object):
         :param name:
         :return:
         """
-        self._add_layer(n_neurons, activator, dropout_layer, name, layer_type='hidden')
+        self._add_layer(n_neurons, activator, dropout_layer, name, w_initial,
+                        layer_type='hidden',)
 
     def add_conv_layer(self, patch_x, patch_y, n_filters, activator=None,
                        strd=(1, 1), pool='max', pool_strd=(2, 2), pool_k=(2, 2),
-                       dropout_layer=False, image_shape=None, name=None):
+                       dropout_layer=False, image_shape=None, name=None, w_initial='xavier'):
         """
 
         :param patch_x:
@@ -158,7 +162,8 @@ class Network(object):
                     [patch_x,       # patch length
                      patch_y,       # patch width
                      _in_size[-1],  # filter height / channels
-                     n_filters])    # number of filters
+                     n_filters],
+                    w_initial)    # number of filters
                 tfnn.histogram_summary(layer_name + '/weights', W_conv)
 
                 # the image summary for visualizing filters
@@ -234,8 +239,10 @@ class Network(object):
         self.Ws.set_value(label=len(self.Ws), value=W_conv)
         self.bs.set_value(label=len(self.bs), value=b_conv)
 
-    def add_output_layer(self, activator=None, dropout_layer=False, name=None):
-        self._add_layer(self.output_size, activator, dropout_layer, name, layer_type='output')
+    def add_output_layer(self, activator=None, dropout_layer=False, name=None,
+                         w_initial='xavier'):
+        self._add_layer(self.output_size, activator, dropout_layer, name,
+                        w_initial, layer_type='output')
         self._init_loss()
 
     def set_optimizer(self, optimizer=None, global_step=None,):
@@ -349,7 +356,8 @@ class Network(object):
     def close(self):
         self.sess.close()
 
-    def _add_layer(self, n_neurons, activator=None, dropout_layer=False, name=None, layer_type=None,):
+    def _add_layer(self, n_neurons, activator=None, dropout_layer=False, name=None,
+                   w_initial='xavier', layer_type=None, ):
         """
         W shape(n_last_layer_neurons, n_this_layer_neurons]
         b shape(n_this_layer_neurons, ]
@@ -399,7 +407,7 @@ class Network(object):
         with tfnn.variable_scope(layer_name):
 
             with tfnn.variable_scope('weights') as weights_scope:
-                W = self._weight_variable([_input_size, n_neurons])
+                W = self._weight_variable([_input_size, n_neurons], initialize=w_initial)
                 tfnn.histogram_summary(layer_name + '/weights', W)
 
                 # the image summary for visualizing filters
@@ -458,13 +466,18 @@ class Network(object):
         self.Ws.set_value(label=len(self.Ws), value=W)
         self.bs.set_value(label=len(self.bs), value=b)
 
-    def _weight_variable(self, shape, initialize='truncated_normal', name='weights'):
+    def _weight_variable(self, shape, initialize='xavier', name='weights'):
         # using a standard deviation of 1/sqrt(N), where N is the number of inputs to the given neuron layer.
         # stddev=1./np.sqrt(shape[0])
+        # for relu the stddev = 1./np.sqrt(shape[0] / 2)
         if initialize == 'truncated_normal':
-            initializer = tfnn.truncated_normal_initializer(mean=0., stddev=1./np.sqrt(shape[0]))
+            initializer = tfnn.truncated_normal_initializer(mean=0., stddev=1./np.sqrt(shape[0]/2))
         elif initialize == 'random_normal':
-            initializer = tfnn.random_normal_initializer(mean=0., stddev=1./np.sqrt(shape[0]))
+            initializer = tfnn.random_normal_initializer(mean=0., stddev=1./np.sqrt(shape[0]/2))
+        elif initialize == 'xavier':
+            # uniform = True for using uniform distribution being the range: x = sqrt(6. / (in + out))
+            # uniform = False for using normal distribution with a standard deviation of sqrt(3. / (in + out))
+            initializer = tfnn.contrib.layers.xavier_initializer(uniform=False)
         else:
             raise ValueError('initializer not support %s' % initialize)
         return tfnn.get_variable(name=name, shape=shape, dtype=self.input_dtype,

@@ -49,4 +49,4 @@ def select_lane(path, lane=1):
 
 if __name__ == '__main__':
     path = 'datasets/I80-0500-0515-filter_0.8_T_v_ldxdvh.pickle'
-    select_lane(path, lane=3)
+    select_lane(path, lane=5)
