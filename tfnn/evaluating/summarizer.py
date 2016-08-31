@@ -6,8 +6,8 @@ import tfnn
 class Summarizer(object):
     def __init__(self, network=None, save_path='/tmp', include_test=False):
         self._include_test = include_test
-        self._network = network
         if network is not None:
+            self._network = network
             check_dir = os.getcwd() + save_path
             if os.path.isdir(check_dir):
                 self.save_path = check_dir
@@ -50,12 +50,14 @@ class Summarizer(object):
         self.test_writer.add_summary(test_result, global_step)
 
     def web_visualize(self, path=None):
-        whole_path = self.save_path + '/tensorflow_logs'
         if (path is None) and (self._network is not None):
+            whole_path = self.save_path + '/tensorflow_logs'
             os.system('tensorboard --logdir=%s' % whole_path)
         elif (path is None) and (not hasattr(self, '_network')):
             raise ValueError('please give path to logs')
         else:
+            if path[0] == '/':
+                path = path[1:]
             os.system('tensorboard --logdir=%s' % path)
 
     def _get_feed_dict(self, xs, ys, keep, l2):

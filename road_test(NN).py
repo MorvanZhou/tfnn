@@ -469,7 +469,7 @@ if __name__ == '__main__':
     which_lane = [1, 3, 4]
     path = ['datasets/I80-0400_lane%i.pickle' % lane for lane in which_lane]
     duration = 1
-    # train(path, duration, save_to='/model%i/' % int(duration*10))
+    train(path, duration, save_to='/model%i/' % int(duration*10))
 
     # test_path = 'datasets/I80-0400_lane2.pickle'
     # compare_real(test_path, duration, model_path='tmp', model='/model%i/' % int(duration*10))
