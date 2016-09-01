@@ -52,11 +52,16 @@ def filter_x(data, alpha, T, dt=0.1):
 
 
     position = results
-    diff_position = position.diff()
-    v = diff_position / 0.1
+    x1 = position.shift(-2)
+    x0 = position.copy()
+    v = (x1 - x0) / .2
+    v = v.shift(1)
+
+    v0 = v.copy()
+    v1 = v.shift(-2)
+    a = (v1 - v0) / .2
+    a = a.shift(1)
     v = v.rename('deri_v')
-    diff_v = v.diff()
-    a = diff_v / 0.1
     a = a.rename('deri_a')
 
     # ignore the value near boundaries due to large biases.
@@ -67,13 +72,6 @@ def filter_x(data, alpha, T, dt=0.1):
 
     results = pd.concat([results, v, a], axis=1)
     results.index = positions.index
-    # vehicle.Local_Y.plot(c='r')
-    # position.plot(c='b')
-    # vehicle.Vehicle_Velocity.plot(c='r')
-    # results.deri_v.plot(c='b')
-    # vehicle.Vehicle_Acceleration.plot(c='r')
-    # results.deri_a.plot(c='b')
-    # plt.show()
     return results
 
 
@@ -161,7 +159,7 @@ def batch_filter(path, T=0.8, selected_filter='f_x', save=True, clip_bound=None)
 
 
 def plot_comparison(data, alpha, which):
-    vehicle = data.loc[data['Vehicle_ID'] == alpha]
+    vehicle = data[data['Vehicle_ID'] == alpha]
     if which == 'p':
         vehicle['Local_Y'].plot(c='r')
         vehicle['filter_position'].plot(c='b')
@@ -169,7 +167,7 @@ def plot_comparison(data, alpha, which):
         plt.legend(loc='best')
     elif which == 'a':
         vehicle['Vehicle_Acceleration'].plot(c='r')
-        vehicle['deri_a'].plot(c='b')
+        vehicle['deri_a_clipped'].plot(c='b')
         plt.ylabel('acceleration')
         plt.legend(loc='best')
     elif which == 'v':
@@ -193,33 +191,42 @@ def plot_comparison(data, alpha, which):
 
 def differentiation(data, alpha):
     vehicle = data.loc[data['Vehicle_ID'] == alpha]
+    # choose to plot filtered result
     position = vehicle['filter_position']
-    diff_position = position.diff().fillna(0)
-    v = diff_position/0.1
+    # choose to plot original result
+    position = vehicle['Local_Y']
+    x1 = position.shift(-2)
+    x0 = position.copy()
+    v = (x1 - x0) / .2
+    v = v.shift(1)
+
+    v0 = v.copy()
+    v1 = v.shift(-2)
+    a = (v1 - v0) / .2
+    a = a.shift(1)
+
     v = v.rename('1st order diff equ of filtered Y')
-    diff_v = v.diff().fillna(0)
-    a = diff_v/0.1
     a = a.rename('2nd order diff equ of filtered Y')
-    start = 5
+    # start = 5
     plt.figure(0)
-    vehicle['Local_Y'].iloc[start:].plot(c='r')
-    vehicle['filter_position'].iloc[start:].plot(c='b')
+    vehicle['Local_Y'].plot(c='r')
+    # vehicle['filter_position'].iloc[start:].plot(c='b')
     plt.xlabel('time')
     plt.ylabel('position')
     plt.legend(loc='best')
 
     plt.figure(1)
-    vehicle['Vehicle_Velocity'].iloc[start:].plot(c='r')
-    vehicle['filter_velocity'].iloc[start:].plot(c='g')
-    v.iloc[start:].plot(c='b')
+    vehicle['Vehicle_Velocity'].plot(c='r')
+    # vehicle['filter_velocity'].iloc[start:].plot(c='g')
+    v.plot(c='b')
     plt.xlabel('time')
     plt.ylabel('velocity')
     plt.legend()
 
     plt.figure(2)
-    vehicle['Vehicle_Acceleration'].iloc[start:].plot(c='r')
-    a.iloc[start:].plot(c='b')
-    vehicle['filter_acceleration'].iloc[start:].plot(c='g')
+    vehicle['Vehicle_Acceleration'].plot(c='r')
+    a.plot(c='b')
+    # vehicle['filter_acceleration'].iloc[start:].plot(c='g')
     plt.legend()
     plt.xlabel('time')
     plt.ylabel('acceleration')
@@ -294,8 +301,8 @@ def extract_v_l_dx_dv_h(path, save=False):
 
 
 if __name__ == '__main__':
-    path = 'datasets/I80-0500-0515.txt'
-    extract(path=path)
+    # path = 'datasets/I80-0500-0515.txt'
+    # extract(path=path)
 
     # select 3000-3300 car example
     # data = pd.read_pickle('datasets/I80-0400-0415.pickle').iloc[1096646:1236558, :]
@@ -306,10 +313,10 @@ if __name__ == '__main__':
     path = 'datasets/I80-0500-0515.pickle'
     batch_filter(path, T=0.8, selected_filter='f_x', clip_bound=(-3.41376, 3.41376), save=True)
 
-    # path = 'datasets/I80-0400-0415-filter.pickle'
+    # path = 'datasets/I80-0400-0415-filter_0.8_T.pickle'
     # data = pd.read_pickle(path)
-    # plot_comparison(data, alpha=59, which='a')
-    # differentiation(data, 231)
+    # plot_comparison(data, alpha=2, which='a')
+    # differentiation(data, 2)
 
     # path = 'datasets/I80-0400-0415-filter_0.8_T.pickle'
     # extract_v_l_dx_dv_h(path, save=True)

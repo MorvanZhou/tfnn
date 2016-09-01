@@ -214,7 +214,7 @@ class Network(object):
             dropped_product = tfnn.nn.dropout(pooled_product,
                                               self.keep_prob_placeholder,
                                               seed=self.seed, name='dropout')
-            final_product = dropped_product
+            final_product = dropped_product/self.keep_prob_placeholder
         else:
             dropped_product = None
             final_product = pooled_product
@@ -227,7 +227,7 @@ class Network(object):
              'neural_structure': {'input_size': _in_size, 'output_size': _out_size},
              'para': {'patch_x': patch_x, 'patch_y': patch_y, 'n_filters': n_filters,
                       'activator': activator_name, 'pool': pool, 'dropout_layer': dropout_layer,
-                      'image_shape': image_shape, 'name': name}}
+                      'image_shape': image_shape, 'name': name, 'w_initial': w_initial}}
         _layer_results_dict = \
             {'Wx_plus_b': product,
              'activated': activated_product,
@@ -443,7 +443,7 @@ class Network(object):
                 dropped_product = tfnn.nn.dropout(activated_product,
                                                   self.keep_prob_placeholder,
                                                   seed=self.seed, name='dropout')
-                final_product = dropped_product
+                final_product = dropped_product/self.keep_prob_placeholder
             else:
                 dropped_product = None
                 final_product = activated_product
@@ -455,7 +455,7 @@ class Network(object):
              'name': layer_name,
              'neural_structure': {'input_size': _input_size, 'output_size': n_neurons},
              'para': {'n_neurons': n_neurons, 'activator': activator_name,
-                      'dropout_layer': dropout_layer, 'name': name}}
+                      'dropout_layer': dropout_layer, 'name': name, 'w_initial': w_initial}}
         _layer_results_dict = \
             {'Wx_plus_b': product,
              'activated': activated_product,

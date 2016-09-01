@@ -43,10 +43,20 @@ def select_lane(path, lane=1):
     old_cols = list(range(4*20))
     all_time_data.rename(columns=dict(zip(old_cols, cols)), inplace=True)
     lane_data = pd.concat([lane_data, all_time_data], axis=1)
+
+    data = lane_data.loc[:, ['Vehicle_ID', 'filter_position']]
+    all_ids = data['Vehicle_ID'].unique()
+    delta_xs = pd.Series(name='delta_x')
+    for car_id in all_ids:
+        p_data = data['filter_position'][data['Vehicle_ID'] == car_id]
+        delta_x = p_data.diff()
+        delta_xs = delta_xs.append(delta_x)
+    lane_data.insert(7, 'delta_x', delta_xs)
     print(lane_data.head())
     # lane1_data.to_csv('datasets/s3.csv')
     lane_data.to_pickle(path[:17]+'_lane%s.pickle' % lane)
 
 if __name__ == '__main__':
-    path = 'datasets/I80-0500-0515-filter_0.8_T_v_ldxdvh.pickle'
+    path = 'datasets/I80-0400-0415-filter_0.8_T_v_ldxdvh.pickle'
     select_lane(path, lane=5)
+

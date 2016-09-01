@@ -13,16 +13,18 @@ def train(data_path, duration, save_to='/tmp/'):
     for lane_path in data_path:
         lane_data = pd.read_pickle(lane_path).dropna().astype(np.float32)
         load_data = pd.concat([load_data, lane_data], axis=0, ignore_index=True)
-    xs = pd.concat(#[load_data.iloc[:, -60-int(duration*10):-60],        # speed
-                    [load_data.iloc[:, -40-int(duration*10):-40],        # leader speed
-                    load_data.iloc[:, -20-int(duration*10):-20],        # spacing
-                    load_data.iloc[:, -int(duration*10):]],             # relative speed
-                   axis=1)
+    xs = pd.concat([
+        # load_data.iloc[:, -60-int(duration*10):-60],        # speed
+        load_data.iloc[:, -40-int(duration*10):-40],        # leader speed
+        load_data.iloc[:, -20-int(duration*10):-20],        # spacing
+        load_data.iloc[:, -int(duration*10):]              # relative speed
+        ], axis=1)
     print(xs.shape)
     print(xs.head(2))
     print('sample size:', load_data.shape[0])
-    # ys = load_data.a
     ys = load_data['deri_v']
+    # ys = load_data['deri_a_clipped']
+    # ys = load_data['delta_x']
     data = tfnn.Data(xs, ys, name='road_data')
 
     network = tfnn.RegNetwork(xs.shape[1], 1, do_dropout=False)
@@ -34,30 +36,30 @@ def train(data_path, duration, save_to='/tmp/'):
     network.add_output_layer(activator=None, dropout_layer=False)
     global_step = tfnn.Variable(0, trainable=False)
     # lr = tfnn.train.exponential_decay(0.001, global_step, 5000, 0.9, staircase=False)
-    optimizer = tfnn.train.AdamOptimizer(0.0001)
+    optimizer = tfnn.train.AdamOptimizer(0.001)
     network.set_optimizer(optimizer, global_step)
     evaluator = tfnn.Evaluator(network)
     summarizer = tfnn.Summarizer(network, save_path='/tmp/', include_test=True)
 
-    for i in range(50000):
+    for i in range(30000):
         b_xs, b_ys = t_data.next_batch(50, loop=True)
         network.run_step(b_xs, b_ys, 0.5)
         if i % 2000 == 0:
             print(evaluator.compute_cost(v_data.xs, v_data.ys))
             summarizer.record_train(b_xs, b_ys, i, 0.5)
             summarizer.record_test(v_data.xs, v_data.ys, i)
-            evaluator.regression_plot_linear_comparison(v_data.xs, v_data.ys, continue_plot=True)
+            # evaluator.regression_plot_linear_comparison(v_data.xs, v_data.ys, continue_plot=True)
     network.save(path='tmp', name=save_to, replace=True)
     network.sess.close()
-    summarizer.web_visualize()
+    # summarizer.web_visualize()
 
 
 def compare_real(path, duration, model_path='tmp', model='/model'):
     # load_data = pd.read_pickle(data_path)
     load_data = pd.read_pickle(path).dropna().astype(np.float32)
     # load_data = pd.read_csv(path, index_col=0).dropna()
-    s = 7000
-    f = s + 1000
+    s = 11000
+    f = s + 500
     # xs = load_data.iloc[s:f, -60:]
     xs = pd.concat([load_data.iloc[s:f, -60 - int(duration*10):-60],    # speed
                     load_data.iloc[s:f, -40 - int(duration*10):-40],    # leader speed
@@ -72,23 +74,8 @@ def compare_real(path, duration, model_path='tmp', model='/model'):
     prediction = network.predict(network.normalizer.fit_transform(xs))
     plt.plot(np.arange(xs.shape[0]), prediction, 'r--', label='predicted')
     network.sess.close()
-
-    # for i in ['02','04', '06', '08', '10', '15']:
-    #     duration = int(i)/10
-    #     xs = pd.concat([load_data.iloc[s:f, -60 - int(duration * 10):-60],  # speed
-    #                     load_data.iloc[s:f, -40 - int(duration * 10):-40],  # leader speed
-    #                     load_data.iloc[s:f, -20 - int(duration * 10):-20]],  # spacing
-    #                    # load_data.iloc[s:f, -int(duration * 10):]],           # relative speed
-    #                    axis=1)
-    #     model = '/model'+i+'/'
-    #     network = network_saver.restore(model)
-    #     prediction = network.predict(network.normalizer.fit_transform(xs))
-    #     plt.plot(np.arange(xs.shape[0]), prediction, '--', label=model)
-    #     network.sess.close()
-
     plt.legend(loc='best')
     plt.show()
-
 
 
 class Car:
@@ -263,21 +250,33 @@ def traj_comparison(data_path, duration, id, model_path='tmp', model='/model',
             elif predict == 'v':
                 # leader_speed, dx, dv
                 # [furthest, nearest]
-                input_data = pd.concat([vl_data, dx_data, dv_data])
+                input_data = pd.concat([
+                    # v_data,
+                    vl_data,
+                    dx_data,
+                    dv_data,
+                ])
                 new_speed = network.predict(network.normalizer.fit_transform(input_data))
                 new_speed = 0 if new_speed < 0 else new_speed
                 test_ps.loc[t, i] = test_ps.loc[t - 1, i] + (test_vs.loc[t - 1, i] + new_speed) / 2 * 0.1
                 test_vs.loc[t, i] = new_speed
                 test_accs.loc[t, i] = (new_speed - test_vs.loc[t - 1, i]) / .1
-            elif predict == 'dx':
+            elif predict == 'delta_x':
+                """
+                !!!!
+                bad idea
+                !!!!
+                """
                 # speed, leader_speed, dx
                 # [furthest, nearest]
                 input_data = pd.concat([v_data, vl_data, dx_data])
-                new_dx = network.predict(network.normalizer.fit_transform(input_data))
-                test_ps.loc[t, i] = ps.loc[t, i-1] - new_dx
-                new_speed = (test_ps.loc[t, i] - test_ps.loc[t-1, i]) / 0.1
-                test_vs.loc[t, i] = new_speed
-                test_accs.loc[t, i] = (new_speed - test_vs.loc[t - 1, i]) / .1
+                delta_x = network.predict(network.normalizer.fit_transform(input_data))
+                delta_x = 0 if delta_x < 0 else delta_x
+                # delta_x = (v0+v1)*t/2
+                # so v1 = delta_x*2/t - v0
+                test_ps.loc[t, i] = test_ps.loc[t-1, i] + delta_x
+                test_vs.loc[t, i] = delta_x/0.1
+                test_accs.loc[t, i] = (test_vs.loc[t, i] - test_vs.loc[t-1, i])/0.1
 
     plt.figure(0)
     plt.title('Position')
@@ -306,7 +305,6 @@ def traj_comparison(data_path, duration, id, model_path='tmp', model='/model',
 
 
 def oscillation(path, duration, id,  model_path='tmp', model='/model'):
-    np.random.seed(11)
     df = pd.read_pickle(path)[['filter_position', 'Vehicle_ID',
                                'Frame_ID', 'deri_v']].dropna().astype(np.float32)
     all_speed = df['deri_v'][(df['filter_position']>=100) & (df['filter_position']<=300)]
@@ -359,7 +357,6 @@ def oscillation(path, duration, id,  model_path='tmp', model='/model'):
         all_speeds = pd.concat([all_speeds, individual_speed], axis=1, ignore_index=True)
 
         for t in range(int(duration*10), all_ps.shape[0]-1):
-
             # speed, leader speed, dx, dv
             # [furthest, nearest]
             v = all_speeds.iloc[t-int(duration*10): t, i]
@@ -464,8 +461,8 @@ def cross_validation(path):
 
 
 if __name__ == '__main__':
-    tfnn.set_random_seed(11)
-    np.random.seed(11)
+    # tfnn.set_random_seed(11)
+    # np.random.seed(11)
     which_lane = [1, 3, 4]
     path = ['datasets/I80-0400_lane%i.pickle' % lane for lane in which_lane]
     duration = 1
