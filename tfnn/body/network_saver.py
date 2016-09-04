@@ -61,9 +61,12 @@ class NetworkSaver(object):
 
         if not self._configs_saved:
             self._configs_saved = True
-            network_configs = {'name': network.name,
-                              'layers_configs': network.layers_configs,
-                              'data_config': network.normalizer.config}
+            network_configs = {
+                'name': network.name,
+                'in_out_size': [network.input_size, network.output_size],
+                'regularization': network.reg,
+                'layers_configs': network.layers_configs,
+                'data_config': network.normalizer.config}
             with open(save_path+'/net_configs.pickle', 'wb') as file:
                 pickle.dump(network_configs, file)
 
@@ -93,13 +96,24 @@ class NetworkSaver(object):
         net_name = network_config['name']  # network.name,
         layers_configs = network_config['layers_configs']  # network.n_inputs,
         data_config = network_config['data_config']  # network.normalizer.config
-        input_size, output_size = layers_configs['neural_structure'].iloc[0]['input_size'], \
-                                  layers_configs['neural_structure'].iloc[-1]['output_size']
+        input_size, output_size = network_config['in_out_size']
+        reg = network_config['regularization']
+        if reg == 'dropout':
+            do_dropout = True
+            do_l2 = False
+        elif reg == 'l2':
+            do_dropout = False
+            do_l2 = True
+        else:
+            do_dropout = False
+            do_l2 = True
         # select the type of network
         if net_name == 'RegressionNetwork':
-            network = tfnn.RegNetwork(input_size, output_size)
+            network = tfnn.RegNetwork(input_size=input_size, output_size=output_size,
+                                      do_dropout=do_dropout, do_l2=do_l2)
         else:
-            network = tfnn.ClfNetwork(input_size, output_size)
+            network = tfnn.ClfNetwork(input_size=input_size, output_size=output_size,
+                                      do_dropout=do_dropout, do_l2=do_l2)
         # set the data configuration
         if data_config is not None:
             network.normalizer.set_config(data_config)
@@ -108,9 +122,7 @@ class NetworkSaver(object):
             if index == 0:
                 continue
             para = layer_configs['para']
-            layer_name = para['name']
             layer_activator = para['activator']
-            layer_drop = para['dropout_layer']
             layer_type = layer_configs['type']
 
             if layer_activator is None:
@@ -128,15 +140,27 @@ class NetworkSaver(object):
             else:
                 raise ValueError('No activator as %s.' % layer_activator)
             if layer_type == 'hidden':
-                network.add_hidden_layer(para['n_neurons'], activator, layer_drop, layer_name)
+                network.add_hidden_layer(
+                    n_neurons=para['n_neurons'], activator=activator,
+                    dropout_layer=para['dropout_layer'], w_initial=para['w_initial'],
+                    name=para['name'])
             elif layer_type == 'fc':
-                network.add_fc_layer(para['n_neurons'], activator, layer_drop, layer_name)
+                network.add_fc_layer(
+                    n_neurons=para['n_neurons'], activator=activator,
+                    dropout_layer=para['dropout_layer'], w_initial=para['w_initial'],
+                    name=para['name'])
             elif layer_type == 'output':
-                network.add_output_layer(activator, layer_drop, layer_name)
+                network.add_output_layer(
+                    activator=activator, dropout_layer=para['dropout_layer'],
+                    w_initial=para['w_initial'], name=para['name'])
             elif layer_type == 'conv':
-                network.add_conv_layer(para['patch_x'], para['patch_y'], para['n_filters'],
-                                       activator, para['pool'], layer_drop, para['image_shape'],
-                                       layer_name)
+                network.add_conv_layer(
+                    patch_x=para['patch_x'], patch_y=para['patch_y'], n_filters=para['n_filters'],
+                    activator=activator, strides=para['strides'], padding=para['padding'],
+                    pooling=para['pooling'], pool_strides=para['pool_strides'],
+                    pool_k=para['pool_k'], pool_padding=para['pool_padding'],
+                    dropout_layer=para['dropout_layer'], image_shape=para['image_shape'],
+                    w_initial=para['w_initial'], name=para['name'], )
         network.sess = tfnn.Session()
         self._network = network
         _saver = tfnn.train.Saver()

@@ -12,7 +12,7 @@ data = tfnn.Data(xs, ys)
 t_data, v_data = data.train_test_split(0.7)
 
 # define network properties
-network = tfnn.RegNetwork(n_inputs=data.xs.shape[1], n_outputs=data.ys.shape[1])
+network = tfnn.RegNetwork(input_size=data.xs.shape[1], output_size=data.ys.shape[1])
 
 # add hidden layer
 network.add_hidden_layer(n_neurons=20, activator=tfnn.nn.relu)
@@ -30,4 +30,4 @@ for i in range(2000):
     b_xs, b_ys = t_data.next_batch(50, loop=True)
     network.run_step(b_xs, b_ys)
     if i % 50 == 0:
-        print(evaluator.compute_cost(v_data.xs, v_data.ys))
+        print('Cost = ', evaluator.compute_cost(v_data.xs, v_data.ys))

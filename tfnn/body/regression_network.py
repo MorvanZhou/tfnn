@@ -4,10 +4,10 @@ import numpy as np
 
 
 class RegNetwork(Network):
-    def __init__(self, n_inputs, n_outputs, do_dropout=False, do_l2=False):
+    def __init__(self, input_size, output_size, do_dropout=False, do_l2=False):
 
         super(RegNetwork, self).__init__(
-            n_inputs, n_outputs, do_dropout, do_l2)
+            input_size, output_size, do_dropout, do_l2)
         self.name = 'RegressionNetwork'
 
     def _init_loss(self):

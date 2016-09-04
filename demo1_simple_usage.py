@@ -5,7 +5,7 @@ import tfnn
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
 # define network properties
-network = tfnn.ClfNetwork(n_inputs=mnist.train.images.shape[1], n_outputs=mnist.train.labels.shape[1])
+network = tfnn.ClfNetwork(input_size=mnist.train.images.shape[1], output_size=mnist.train.labels.shape[1])
 
 # add hidden layer
 network.add_hidden_layer(n_neurons=20, activator=tfnn.nn.relu)
@@ -23,6 +23,6 @@ evaluator = tfnn.Evaluator(network)
 network.fit(mnist.train.images, mnist.train.labels, steps=2000)
 
 # use evaluator to compute accuracy and loss
-print(evaluator.compute_accuracy(xs=mnist.test.images, ys=mnist.test.labels))
+print('accuracy: ', evaluator.compute_accuracy(xs=mnist.test.images, ys=mnist.test.labels))
 
 

@@ -6,10 +6,10 @@ from tfnn.datasets.normalizer import Normalizer
 
 
 class Network(object):
-    def __init__(self, n_inputs, n_outputs, do_dropout, do_l2):
+    def __init__(self, input_size, output_size, do_dropout, do_l2):
         self.normalizer = Normalizer()
-        self.input_size = n_inputs
-        self.output_size = n_outputs
+        self.input_size = input_size
+        self.output_size = output_size
         if do_dropout and do_l2:
             raise ValueError('Cannot do dropout and l2 at once. Choose only one of them.')
         if do_dropout:
@@ -20,8 +20,8 @@ class Network(object):
             self.reg = None
 
         with tfnn.name_scope('inputs'):
-            self.data_placeholder = tfnn.placeholder(dtype=tfnn.float32, shape=[None, n_inputs], name='x_input')
-            self.target_placeholder = tfnn.placeholder(dtype=tfnn.float32, shape=[None, n_outputs], name='y_input')
+            self.data_placeholder = tfnn.placeholder(dtype=tfnn.float32, shape=[None, self.input_size], name='x_input')
+            self.target_placeholder = tfnn.placeholder(dtype=tfnn.float32, shape=[None, self.output_size], name='y_input')
             if do_dropout:
                 self.keep_prob_placeholder = tfnn.placeholder(dtype=tfnn.float32)
                 tfnn.scalar_summary('dropout_keep_probability', self.keep_prob_placeholder)
@@ -35,9 +35,9 @@ class Network(object):
         _input_layer_configs = \
             {'type': ['input'],
              'name': ['input_layer'],
-             'neural_structure': [{'input_size': n_inputs, 'output_size': n_inputs}],
+             'neural_structure': [{'input_size': self.input_size, 'output_size': self.input_size}],
              'para': [_para],
-             'net_in_out': [{'n_inputs': self.input_size, 'n_outputs': self.output_size}]}
+             'net_in_out': [{'input_size': self.input_size, 'output_size': self.output_size}]}
         _input_layer_results = \
             {'Wx_plus_b': [None],
              'activated': [None],
@@ -97,8 +97,8 @@ class Network(object):
         _layer.construct(self.layers_configs, self.layers_results)
         self._add_to_log(_layer)
 
-    def add_output_layer(self, activator=None, dropout_layer=False, name=None,
-                         w_initial='xavier'):
+    def add_output_layer(self, activator=None, dropout_layer=False,
+                         w_initial='xavier', name=None,):
         _layer = tfnn.OutputLayer(activator, dropout_layer,
                                   w_initial, name)
         _layer.construct(self.layers_configs, self.layers_results)

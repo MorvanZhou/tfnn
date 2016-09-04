@@ -25,7 +25,7 @@ class OutputLayer(Layer):
         self.n_neurons = None
 
     def construct(self, layers_configs, layers_results):
-        self.n_neurons = layers_configs['net_in_out'].iloc[0]['n_outputs']
+        self.n_neurons = layers_configs['net_in_out'].iloc[0]['output_size']
         self._construct(self.n_neurons, layers_configs, layers_results)
 
 

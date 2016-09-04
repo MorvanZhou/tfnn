@@ -149,7 +149,7 @@ class ConvLayer(Layer):
                      'padding': self.padding, 'pooling': self.pooling,
                      'pool_strides': self.pool_strides, 'pool_k': self.pool_k,
                      'pool_padding': self.pool_padding, 'dropout_layer': self.dropout_layer,
-                     'image_shape': self.image_shape, 'name': self.name, 'w_initial': self.w_initial}}
+                     'image_shape': self.image_shape, 'w_initial': self.w_initial, 'name': self.name, }}
         self.results_dict = {
             'Wx_plus_b': product,
             'activated': activated_product,
