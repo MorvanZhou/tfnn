@@ -84,7 +84,7 @@ class Network(object):
         :param patch_x:
         :param patch_y:
         :param n_features:
-        :param activator:
+        :param activator: string or tfnn.nn.some_activation
         :param pool:
         :param dropout_layer:
         :param image_shape: should be a tuple or list of image (length, width, channels)
@@ -196,6 +196,8 @@ class Network(object):
                                  W_conv, strd) + b_conv
 
             if activator is not None:
+                if isinstance(activator, str):
+                    activator = self._get_activator(activator)
                 activated_product = activator(product)  # output size 28x28x32
             else:
                 activated_product = product
@@ -276,18 +278,21 @@ class Network(object):
         if self.reg == 'dropout':
             if keep_prob is None:
                 raise ValueError('need pass a keep_prob for run_step')
-            self.sess.run(self._train_op, feed_dict={self.data_placeholder: feed_xs,
-                                                    self.target_placeholder: feed_ys,
-                                                    self.keep_prob_placeholder: keep_prob})
+            self.sess.run(self._train_op, feed_dict={
+                self.data_placeholder: feed_xs,
+                self.target_placeholder: feed_ys,
+                self.keep_prob_placeholder: keep_prob})
         elif self.reg == 'l2':
             if l2 is None:
                 raise ValueError('need pass a l2 for run_step')
-            self.sess.run(self._train_op, feed_dict={self.data_placeholder: feed_xs,
-                                                    self.target_placeholder: feed_ys,
-                                                    self.l2_placeholder: l2})
+            self.sess.run(self._train_op, feed_dict={
+                self.data_placeholder: feed_xs,
+                self.target_placeholder: feed_ys,
+                self.l2_placeholder: l2})
         else:
-            self.sess.run(self._train_op, feed_dict={self.data_placeholder: feed_xs,
-                                                    self.target_placeholder: feed_ys})
+            self.sess.run(self._train_op, feed_dict={
+                self.data_placeholder: feed_xs,
+                self.target_placeholder: feed_ys})
 
     def fit(self, feed_xs, feed_ys, steps=2000, *args):
         """
@@ -436,6 +441,8 @@ class Network(object):
             if activator is None:
                 activated_product = product
             else:
+                if isinstance(activator, str):
+                    activator = self._get_activator(activator)
                 activated_product = activator(product)
             tfnn.histogram_summary(layer_name+'/activated_product', activated_product)
 
@@ -491,3 +498,27 @@ class Network(object):
     def _init_loss(self):
         """do not use in network.py"""
         self.loss = None
+
+    @staticmethod
+    def _get_activator(name):
+        if name == 'relu':
+            activator = tfnn.nn.relu
+        elif name == 'relu6':
+            activator = tfnn.nn.relu6
+        elif name == 'tanh':
+            activator = tfnn.nn.tanh
+        elif name == 'sigmoid':
+            activator = tfnn.nn.sigmoid
+        elif name == 'elu':
+            activator = tfnn.nn.elu
+        elif name == 'softplus':
+            activator = tfnn.nn.softplus
+        elif name == 'softsign':
+            activator = tfnn.nn.softsign
+        elif name == 'softmax':
+            activator = tfnn.nn.softmax
+        else:
+            raise ValueError(
+                '''the activation function %s is not supported. Function available:
+                [relu, relu6, elu, tanh, sigmoid, softplus, softsign, softmax]''' % name)
+        return activator
