@@ -48,9 +48,10 @@ def train(data_path, duration, save_to='/tmp/'):
             print(evaluator.compute_cost(v_data.xs, v_data.ys))
             summarizer.record_train(b_xs, b_ys, i, 0.5)
             summarizer.record_test(v_data.xs, v_data.ys, i)
-            # evaluator.regression_plot_linear_comparison(v_data.xs, v_data.ys, continue_plot=True)
+            # evaluator.plot_regression_linear_comparison(v_data.xs, v_data.ys, continue_plot=True)
     network.save(path='tmp', name=save_to, replace=True)
     network.sess.close()
+    evaluator.hold_plot()
     # summarizer.web_visualize()
 
 

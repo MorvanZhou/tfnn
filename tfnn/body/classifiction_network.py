@@ -4,29 +4,12 @@ import numpy as np
 
 
 class ClfNetwork(Network):
-    def __init__(self, n_inputs, n_outputs, method='softmax', do_dropout=False, do_l2=False, seed=None):
-        """
+    def __init__(self, n_inputs, n_outputs, method='softmax', do_dropout=False, do_l2=False,):
 
-        :param input_size: if CNN, this is the image [length, width, channels]
-        :param output_size:
-        :param method:
-        :param do_dropout:
-        :param do_l2:
-        :param seed:
-        """
-        if method == 'softmax':
-            input_dtype = tfnn.float32
-            output_dtype = tfnn.float32
-            output_activator = tfnn.nn.softmax
-        elif method == 'sigmoid':
-            input_dtype = tfnn.float32
-            output_dtype = tfnn.float32
-            output_activator = tfnn.sigmoid
-        else:
+        if method not in ['softmax', 'sigmoid']:
             raise ValueError("method should be one of ['softmax', 'sigmoid']")
         super(ClfNetwork, self).__init__(
-            n_inputs, n_outputs, input_dtype, output_dtype, output_activator,
-            do_dropout, do_l2, seed)
+            n_inputs, n_outputs, do_dropout, do_l2)
         self.method = method
         self.name = 'ClassificationNetwork'
 

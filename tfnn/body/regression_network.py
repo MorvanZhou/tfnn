@@ -4,27 +4,15 @@ import numpy as np
 
 
 class RegNetwork(Network):
-    def __init__(self, n_inputs, n_outputs, intput_dtype=tfnn.float32, output_dtype=tfnn.float32,
-                 do_dropout=False, do_l2=False, seed=None):
-        """
+    def __init__(self, n_inputs, n_outputs, do_dropout=False, do_l2=False):
 
-        :param input_size: if CNN, this is the image [length, width, channels]
-        :param output_size:
-        :param intput_dtype:
-        :param output_dtype:
-        :param do_dropout:
-        :param do_l2:
-        :param seed:
-        """
-        output_activator = None
         super(RegNetwork, self).__init__(
-            n_inputs, n_outputs, intput_dtype, output_dtype, output_activator,
-            do_dropout, do_l2, seed)
+            n_inputs, n_outputs, do_dropout, do_l2)
         self.name = 'RegressionNetwork'
 
     def _init_loss(self):
         with tfnn.name_scope('predictions'):
-            self.predictions = self.layers_results['final'].iloc[-1] + 0
+            self.predictions = self.layers_results['final'].iloc[-1]
         with tfnn.name_scope('loss'):
             loss_square = tfnn.square(self.target_placeholder - self.predictions,
                                       name='loss_square')

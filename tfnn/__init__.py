@@ -6,6 +6,8 @@ from tensorflow import *
 from tfnn.datasets.data import Data
 from tfnn.body.regression_network import RegNetwork
 from tfnn.body.classifiction_network import ClfNetwork
+from tfnn.body.norm_layer import FCLayer, HiddenLayer, OutputLayer
+from tfnn.body.conv_layer import ConvLayer
 from tfnn.body.network_saver import NetworkSaver
 
 from tfnn.evaluating.evaluator import Evaluator
