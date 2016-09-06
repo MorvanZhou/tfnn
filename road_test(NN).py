@@ -424,7 +424,7 @@ def cross_validation(path):
             network.run_step(b_xs, b_ys, 0.5)
             if i % 200 == 0:
                 cost = evaluator.compute_cost(v_data.xs, v_data.ys)
-                r2 = evaluator.compute_r2_score(v_data.xs, v_data.ys)
+                r2 = evaluator.compute_r2(v_data.xs, v_data.ys)
 
                 # cost_train = evaluator.compute_cost(t_data.xs, t_data.ys)  #
                 # r2_train = evaluator.compute_r2_score(t_data.xs, t_data.ys)  #
