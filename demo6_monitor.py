@@ -20,13 +20,14 @@ t_data, v_data = norm_data.train_test_split(0.7)
 
 # set hidden layer
 h1 = tfnn.HiddenLayer(n_neurons=10, activator='relu')
-h2 = tfnn.HiddenLayer(n_neurons=10, activator='relu')
+h2 = tfnn.HiddenLayer(n_neurons=10, activator='tanh')
+h3 = tfnn.HiddenLayer(n_neurons=5, activator='relu')
 
 # set output layer
 out = tfnn.OutputLayer(activator=None)
 
 # build network layers
-network.build_layers([h1, h2, out])
+network.build_layers([h1, h2, h3, out])
 
 # set optimizer. Default GradientDescent
 network.set_optimizer(tfnn.train.GradientDescentOptimizer(0.0001))
@@ -34,15 +35,15 @@ network.set_optimizer(tfnn.train.GradientDescentOptimizer(0.0001))
 # set evaluator for compute the accuracy, loss etc.
 evaluator = tfnn.Evaluator(network)
 
-# set Score Monitor for live plot
-evaluator.set_score_monitor(['r2', 'cost'])
+# set Layer Monitor for instantly plot weights and outputs results
+evaluator.set_layer_monitor([0, 1, ])  # [0, 1] represents the 0th layer and 1st layer
 
 # train network
 for step in range(400):
-    b_xs, b_ys = t_data.next_batch(20, loop=True)
+    b_xs, b_ys = t_data.next_batch(10, loop=True)
     network.run_step(b_xs, b_ys)
     if step % 10 == 0:
-        evaluator.monitoring(b_xs, b_ys, global_step=step, v_xs=v_data.xs, v_ys=v_data.ys)
+        evaluator.monitoring(b_xs, b_ys,)
 evaluator.hold_plot()
 
 

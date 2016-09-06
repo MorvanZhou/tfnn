@@ -174,6 +174,7 @@ class ConvLayer(Layer):
                 replaced_image_shape.insert(0, -1)
                 with tfnn.name_scope('reshape_inputs'):
                     _image_placeholder = tfnn.reshape(_xs_placeholder, replaced_image_shape)
+                layers_results['activated'].iloc[-1] = _image_placeholder
                 layers_results['final'].iloc[-1] = _image_placeholder
             else:
                 raise IndexError('This is not the first conv layer, leave image_shape as default')

@@ -12,4 +12,3 @@ from tfnn.body.network_saver import NetworkSaver
 
 from tfnn.evaluating.evaluator import Evaluator
 from tfnn.evaluating.summarizer import Summarizer
-from tfnn.evaluating.live_visualizer import LiveVisualizer

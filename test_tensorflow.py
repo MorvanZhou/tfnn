@@ -33,24 +33,27 @@ h2 = tfnn.HiddenLayer(10, activator='tanh', dropout_layer=False)
 out = tfnn.OutputLayer(activator=None, w_initial='random_normal')
 network.build_layers([h1, h2, out])
 
-optimizer = tfnn.train.GradientDescentOptimizer(0.01)
+optimizer = tfnn.train.GradientDescentOptimizer(0.001)
 network.set_optimizer(optimizer)
 evaluator = tfnn.Evaluator(network)
+evaluator.set_score_monitor(['cost', 'r2'])
+# evaluator.set_layer_monitor([0, 1, 2])
 # write summarizer at the end of the structure
-summarizer = tfnn.Summarizer(network, save_path='tmp',)
+# summarizer = tfnn.Summarizer(network, save_path='tmp',)
 
 for i in range(1000):
     b_xs, b_ys = t_data.next_batch(50, loop=True)
     # b_xs, b_ys = mnist.train.next_batch(50)
     network.run_step(b_xs, b_ys, 0.5)
-    if i % 50 == 0:
+    if i % 30 == 0:
         # print(evaluator.compute_accuracy(v_data.xs, v_data.ys))
-        # evaluator.plot_regression_linear_comparison(v_data.xs, v_data.ys, True)
+        evaluator.plot_regression_linear_comparison(v_data.xs, v_data.ys, True)
         # evaluator.plot_regression_nonlinear_comparison(v_data.xs, v_data.ys, continue_plot=True)
         # print(evaluator.compute_cost(v_data.xs, v_data.ys))
         # print(evaluator.compute_accuracy(b_xs, b_ys))
         # summarizer.record_train(b_xs, b_ys, i, 0.5, )
-        evaluator.plot_instant_cost_r2(b_xs, b_ys, i, v_data.xs, v_data.ys)
+        evaluator.monitoring(b_xs, b_ys, i, v_xs=v_data.xs, v_ys=v_data.ys)
+        # evaluator.monitoring(b_xs, b_ys, i, v_xs=mnist.test.images, v_ys=mnist.test.labels)
         # evaluator.plot_instant_cost_r2(b_xs, b_ys, i, mnist.test.images, mnist.test.labels)
         # summarizer.record_test(v_data.xs, v_data.ys, i)
         # summarizer.record_test(mnist.test.images, mnist.test.labels, i)
