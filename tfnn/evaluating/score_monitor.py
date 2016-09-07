@@ -61,10 +61,16 @@ class ScoreMonitor(Monitor):
                 self._v_logs = pd.DataFrame(columns=object_names)
                 self._v_logs = self._v_logs.append(v_results, ignore_index=True)
             for _name in object_names:
-                self._tplot_axes[_name], = self._axes[_name].plot([1,1], [1,1], c='r', ls='-', label='train')
+                self._tplot_axes[_name], = self._axes[_name].plot([1, 1], [1, 1],
+                                                                  c='#9999ff',   # red like
+                                                                  ls='-',
+                                                                  lw=2, label='train')
             if v_xs is not None:
                 for _name in object_names:
-                    self._vplot_axes[_name], = self._axes[_name].plot([2,2], [2,2], c='b', ls='--', label='test')
+                    self._vplot_axes[_name], = self._axes[_name].plot([2, 2], [2, 2],
+                                                                      c='#ff9999',  # blue like
+                                                                      ls='--',
+                                                                      lw=2, label='test')
             for _name in object_names:
                 if _name in ['r2', 'accuracy', 'f1']:
                     self._axes[_name].legend(loc='lower right')
@@ -82,20 +88,12 @@ class ScoreMonitor(Monitor):
             for _name in object_names:
                 self._tplot_axes[_name].set_xdata(self._epoch)
                 self._tplot_axes[_name].set_ydata(self._t_logs[_name].values)
-                # self._axes[_name].plot(self._epoch, self._t_logs[_name].values, 'r-', label='train', )
                 if v_xs is not None:
-                    self._vplot_axes[_name].set_xdata(self._epoch)
-                    self._vplot_axes[_name].set_ydata(self._v_logs[_name].values)
-                    # self._axes[_name].plot(self._epoch, self._v_logs[_name].values, 'b--', label='test', )
+                    self._vplot_axes[_name].set_data(self._epoch, self._v_logs[_name].values)
                 self._axes[_name].relim()
                 self._axes[_name].autoscale_view()
             self._fig.canvas.draw()
             self._fig.canvas.flush_events()
             plt.pause(self._sleep)
 
-
-    @staticmethod
-    def hold_plot():
-        plt.ioff()
-        plt.show()
 

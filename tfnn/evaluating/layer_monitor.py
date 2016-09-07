@@ -103,8 +103,4 @@ class LayerMonitor(Monitor):
         plt.pause(self._sleep)
 
 
-    @staticmethod
-    def hold_plot():
-        plt.ioff()
-        plt.show()
 

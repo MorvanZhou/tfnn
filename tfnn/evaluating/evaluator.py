@@ -1,16 +1,16 @@
 import tfnn
 import matplotlib.pyplot as plt
+import numpy as np
 from tfnn.evaluating.score_monitor import ScoreMonitor
 from tfnn.evaluating.layer_monitor import LayerMonitor
+from tfnn.evaluating.data_fitting_monitor import DataFittingMonitor
+from tfnn.evaluating.line_fitting_monitor import LineFittingMonitor
 plt.style.use('ggplot')
 
 
 class Evaluator(object):
     def __init__(self, network, ):
         self.network = network
-        if isinstance(self.network, tfnn.RegNetwork):
-            self.first_time_lm = True
-            self.first_time_soc = True
 
         if isinstance(self.network, tfnn.ClfNetwork):
             with tfnn.name_scope('accuracy'):
@@ -126,15 +126,7 @@ class Evaluator(object):
         self.layer_monitor = LayerMonitor(grid_space, objects, self, figsize, cbar_range, cmap, sleep)
         return self.layer_monitor
 
-    def monitoring(self, t_xs, t_ys, global_step=None, v_xs=None, v_ys=None):
-        if hasattr(self, 'score_monitor'):
-            if global_step is None:
-                raise ValueError('Pass global_step to this monitoring function')
-            self.score_monitor.monitoring(t_xs, t_ys, global_step, v_xs, v_ys)
-        if hasattr(self, 'layer_monitor'):
-            self.layer_monitor.monitoring(t_xs, t_ys)
-
-    def plot_regression_linear_comparison(self, xs, ys, continue_plot=False):
+    def set_data_fitting_monitor(self, figsize=(8, 7), sleep=0.001):
         """
         Suitable for analysing the datasets with only one output unit.
         :param v_xs: validated xs
@@ -144,31 +136,27 @@ class Evaluator(object):
         """
         if not isinstance(self.network, tfnn.RegNetwork):
             raise NotImplementedError('Can only plot for Regression neural network.')
-        elif ys.shape[1] > 1:
-            raise NotImplementedError('Can only support ys which have single value.')
-        feed_dict = self.get_feed_dict(xs, ys)
-        y_predict = self.network.predictions.eval(feed_dict, self.network.sess)
-        if self.first_time_soc:
-            y_real_max, y_real_min = ys.min(), ys.max()
-            self.first_time_soc = False
-            self.fig_soc, self.ax_soc = plt.subplots()
-            self.scat_soc = self.ax_soc.scatter(ys, y_predict, label='predicted', alpha=0.5)
-            self.ax_soc.plot([y_real_min, y_real_max], [y_real_min, y_real_max], 'r--', lw=4, label='real')
-            self.ax_soc.grid(True)
-            self.ax_soc.legend(loc='upper left')
-            self.ax_soc.set_xlabel('Real data')
-            offset = 0.1 * (y_real_max[0] - y_real_min[0])
-            self.ax_soc.set_ylim([y_real_min[0] - offset, y_real_max[0] + offset])
-            self.ax_soc.set_xlim([y_real_min[0] - offset, y_real_max[0] + offset])
-            self.ax_soc.set_ylabel('Predicted')
-            if continue_plot:
-                plt.ion()
-            plt.show()
-        else:
-            plt.pause(0.02)
-            self.scat_soc.remove()
-            self.scat_soc = self.ax_soc.scatter(ys, y_predict, label='predicted', alpha=0.5)
-            plt.draw()
+        self.data_fitting_monitor = DataFittingMonitor(self, figsize, sleep)
+        return self.data_fitting_monitor
+
+    def set_line_fitting_monitor(self, figsize=(8, 7), sleep=0.001):
+        if not isinstance(self.network, tfnn.RegNetwork):
+            raise NotImplementedError('Can only plot this result for Regression neural network.')
+        self.line_fitting_monitor = LineFittingMonitor(self, figsize, sleep)
+        return self.line_fitting_monitor
+
+    def monitoring(self, t_xs, t_ys, **kwargs):
+        if hasattr(self, 'score_monitor'):
+            v_xs, v_ys, global_step = kwargs['v_xs'], kwargs['v_ys'], kwargs['global_step']
+            self.score_monitor.monitoring(t_xs, t_ys, global_step, v_xs, v_ys)
+        if hasattr(self, 'layer_monitor'):
+            self.layer_monitor.monitoring(t_xs, t_ys)
+        if hasattr(self, 'data_fitting_monitor'):
+            v_xs, v_ys = kwargs['v_xs'], kwargs['v_ys']
+            self.data_fitting_monitor.monitoring(v_xs, v_ys)
+        if hasattr(self, 'line_fitting_monitor'):
+            self.line_fitting_monitor.monitoring(t_xs, t_ys)
+
 
     def plot_regression_nonlinear_comparison(self, xs, ys, continue_plot=False):
         """
@@ -182,23 +170,7 @@ class Evaluator(object):
             raise NotImplementedError('Can only plot this result for Regression neural network.')
         elif ys.shape[1] > 1:
             raise NotImplementedError('Can only support ys which have single value.')
-        feed_dict = self.get_feed_dict(xs, ys)
-        y_predict = self.network.predictions.eval(feed_dict, self.network.sess)
-        if self.first_time_lm:
-            self.first_time_lm = False
-            self.fig_lm, self.ax_lm = plt.subplots()
-            self.ax_lm.scatter(xs, ys, c='red', s=20, alpha=0.5)
-            self.scat_lm = self.ax_lm.scatter(xs, y_predict, c='blue', s=20, alpha=0.5)
-            self.ax_lm.set_xlabel('Input')
-            self.ax_lm.set_ylabel('Output')
-            if continue_plot:
-                plt.ion()
-            plt.show()
-        else:
-            plt.pause(0.02)
-            self.scat_lm.remove()
-            self.scat_lm = self.ax_lm.scatter(xs, y_predict, c='blue', s=20, alpha=0.5)
-            plt.draw()
+
 
     def get_feed_dict(self, xs, ys):
         if self.network.reg == 'dropout':
