@@ -36,7 +36,7 @@ network.set_optimizer(tfnn.train.GradientDescentOptimizer(0.0001))
 evaluator = tfnn.Evaluator(network)
 
 # set Layer Monitor for instantly plot weights and outputs results
-evaluator.set_layer_monitor([0, 1, ])  # [0, 1] represents the 0th layer and 1st layer
+evaluator.set_layer_monitor([0, 1, ], figsize=(8, 8))  # [0, 1] represents the 0th layer and 1st layer
 
 # train network
 for step in range(400):

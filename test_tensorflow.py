@@ -29,25 +29,28 @@ norm_data = network.normalizer.minmax_fit(data)
 t_data, v_data = norm_data.train_test_split(0.7)
 
 h1 = tfnn.HiddenLayer(100, activator='relu', dropout_layer=False)
-h2 = tfnn.HiddenLayer(10, activator='tanh', dropout_layer=False)
+h2 = tfnn.HiddenLayer(50, activator='tanh', dropout_layer=False)
 out = tfnn.OutputLayer(activator=None, w_initial='random_normal')
 network.build_layers([h1, h2, out])
 
-optimizer = tfnn.train.GradientDescentOptimizer(0.001)
+optimizer = tfnn.train.GradientDescentOptimizer(0.0001)
 network.set_optimizer(optimizer)
 evaluator = tfnn.Evaluator(network)
-evaluator.set_score_monitor(['cost', 'r2'])
-# evaluator.set_layer_monitor([0, 1, 2])
+# evaluator.set_score_monitor(['cost', 'r2'])
+evaluator.set_layer_monitor([0, 1, 2], figsize=(10, 10), cbar_range=(-0.4, 0.4))
 # write summarizer at the end of the structure
 # summarizer = tfnn.Summarizer(network, save_path='tmp',)
-
-for i in range(1000):
+st = time.time()
+for i in range(5000):
     b_xs, b_ys = t_data.next_batch(50, loop=True)
     # b_xs, b_ys = mnist.train.next_batch(50)
     network.run_step(b_xs, b_ys, 0.5)
-    if i % 30 == 0:
+    if i % 100 == 0:
+        now = time.time()
+        print('time spend: ', round(now - st, 2))
+        st = now
         # print(evaluator.compute_accuracy(v_data.xs, v_data.ys))
-        evaluator.plot_regression_linear_comparison(v_data.xs, v_data.ys, True)
+        # evaluator.plot_regression_linear_comparison(v_data.xs, v_data.ys, True)
         # evaluator.plot_regression_nonlinear_comparison(v_data.xs, v_data.ys, continue_plot=True)
         # print(evaluator.compute_cost(v_data.xs, v_data.ys))
         # print(evaluator.compute_accuracy(b_xs, b_ys))

@@ -95,7 +95,7 @@ class Evaluator(object):
         feed_dict = self.get_feed_dict(xs, ys)
         return self.f1.eval(feed_dict, self.network.sess)
 
-    def set_score_monitor(self, objects,):
+    def set_score_monitor(self, objects, figsize=(10, 10), sleep=0.001):
         """
         :param objects: a list. A list like ['cost', 'r2'];
         :param grid_space: a tuple or list of (max_rows, max_cols);
@@ -112,17 +112,18 @@ class Evaluator(object):
         if isinstance(self.network, tfnn.RegNetwork):
             if ('accuracy' in objects) or ('f1' in objects):
                 raise ValueError('accuracy or f1 score are not used for regression networks')
-        self.score_monitor = ScoreMonitor(grid_space, objects, self)
+        self.score_monitor = ScoreMonitor(grid_space, objects, self, figsize, sleep)
         return self.score_monitor
 
-    def set_layer_monitor(self, objects, ):
+    def set_layer_monitor(self, objects, figsize=(13, 13), cbar_range=(-1, 1), cmap='rainbow',
+                          sleep=0.001):
         if isinstance(objects, (tuple, list)):
             grid_space = (len(objects)+1, 2)
         else:
             raise ValueError("""objects should be a a list or dictionary. A list of layer index like
                                 [0, 1, 3].
                                 Not a %s""" % type(objects))
-        self.layer_monitor = LayerMonitor(grid_space, objects, self)
+        self.layer_monitor = LayerMonitor(grid_space, objects, self, figsize, cbar_range, cmap, sleep)
         return self.layer_monitor
 
     def monitoring(self, t_xs, t_ys, global_step=None, v_xs=None, v_ys=None):

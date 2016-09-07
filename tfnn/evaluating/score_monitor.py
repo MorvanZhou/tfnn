@@ -4,17 +4,21 @@ from tfnn.evaluating.monitor import Monitor
 
 
 class ScoreMonitor(Monitor):
-    def __init__(self, grid_space, objects, evaluator):
+    def __init__(self, grid_space, objects, evaluator, figsize, sleep=0.001):
         super(ScoreMonitor, self).__init__(evaluator, 'score_monitor')
         self._axes = {}
-        fig = plt.figure()
+        self._tplot_axes = {}
+        self._vplot_axes = {}
+        self._fig = plt.figure(figsize=figsize)
+        self._sleep = sleep
+        self._1st_plot = True
         for r_loc, name in enumerate(objects):
             r_span, c_span = 1, grid_space[1]
             self._axes[name] = plt.subplot2grid(grid_space, (r_loc, 0), colspan=c_span, rowspan=r_span)
             if name != objects[-1]:
                 plt.setp(self._axes[name].get_xticklabels(), visible=False)
             self._axes[name].set_ylabel(r'$%s$' % name)
-        fig.subplots_adjust(hspace=0.1)
+        self._fig.subplots_adjust(hspace=0.1)
         plt.ion()
         plt.show()
 
@@ -56,9 +60,11 @@ class ScoreMonitor(Monitor):
             if v_xs is not None:
                 self._v_logs = pd.DataFrame(columns=object_names)
                 self._v_logs = self._v_logs.append(v_results, ignore_index=True)
-            [self._axes[_name].plot([], [], c='r', ls='-', label='train') for _name in object_names]
+            for _name in object_names:
+                self._tplot_axes[_name], = self._axes[_name].plot([1,1], [1,1], c='r', ls='-', label='train')
             if v_xs is not None:
-                [self._axes[_name].plot([], [], c='b', ls='--', label='test') for _name in object_names]
+                for _name in object_names:
+                    self._vplot_axes[_name], = self._axes[_name].plot([2,2], [2,2], c='b', ls='--', label='test')
             for _name in object_names:
                 if _name in ['r2', 'accuracy', 'f1']:
                     self._axes[_name].legend(loc='lower right')
@@ -72,17 +78,20 @@ class ScoreMonitor(Monitor):
         if v_xs is not None:
             self._v_logs = self._v_logs.append(v_results, ignore_index=True)
 
-        if len(self._t_logs) == 2:
+        if len(self._t_logs) >= 2:
             for _name in object_names:
-                self._axes[_name].plot(self._epoch, self._t_logs[_name].values, 'r-', label='train', )
-            self._t_logs = self._t_logs.iloc[-1:, :]
-            if v_xs is not None:
-                for _name in object_names:
-                    self._axes[_name].plot(self._epoch, self._v_logs[_name].values, 'b--', label='test', )
-                self._v_logs = self._v_logs.iloc[-1:, :]
-            self._epoch = self._epoch[-1:]
-            plt.draw()
-            plt.pause(0.01)
+                self._tplot_axes[_name].set_xdata(self._epoch)
+                self._tplot_axes[_name].set_ydata(self._t_logs[_name].values)
+                # self._axes[_name].plot(self._epoch, self._t_logs[_name].values, 'r-', label='train', )
+                if v_xs is not None:
+                    self._vplot_axes[_name].set_xdata(self._epoch)
+                    self._vplot_axes[_name].set_ydata(self._v_logs[_name].values)
+                    # self._axes[_name].plot(self._epoch, self._v_logs[_name].values, 'b--', label='test', )
+                self._axes[_name].relim()
+                self._axes[_name].autoscale_view()
+            self._fig.canvas.draw()
+            self._fig.canvas.flush_events()
+            plt.pause(self._sleep)
 
 
     @staticmethod
