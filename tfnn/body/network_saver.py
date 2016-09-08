@@ -118,7 +118,7 @@ class NetworkSaver(object):
         if data_config is not None:
             network.normalizer.set_config(data_config)
         # set each layer
-        for index, layer_configs in layers_configs.iterrows():
+        for index, layer_configs in enumerate(layers_configs):
             if index == 0:
                 continue
             para = layer_configs['para']

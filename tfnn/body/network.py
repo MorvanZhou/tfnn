@@ -1,4 +1,3 @@
-import pandas as pd
 import numpy as np
 import tfnn
 from tfnn.body.layer import Layer
@@ -33,22 +32,24 @@ class Network(object):
             else:
                 _para = {'reg': self.reg}
         _para['ntype'] = ntype
-        _input_layer_configs = \
-            {'type': ['input'],
-             'name': ['input_layer'],
-             'neural_structure': [{'input_size': self.input_size, 'output_size': self.input_size}],
-             'para': [_para],
-             'net_in_out': [{'input_size': self.input_size, 'output_size': self.output_size}]}
-        _input_layer_results = \
-            {'Layer': [None],
-             'Wx_plus_b': [None],
-             'activated': [None],
-             'dropped': [None],
-             'final': [self.data_placeholder]}
+        _input_layer_configs = {
+            'type': 'input',
+            'name': 'input_layer',
+            'neural_structure': {'input_size': self.input_size, 'output_size': self.input_size},
+            'para': _para,
+            'net_in_out': {'input_size': self.input_size, 'output_size': self.output_size}
+        }
+        _input_layer_results = {
+            'Layer': None,
+            'Wx_plus_b': None,
+            'activated': None,
+            'dropped': None,
+            'final': self.data_placeholder
+        }
 
-        self.layers_configs = pd.DataFrame(_input_layer_configs)
-        self.layers_results = pd.DataFrame(_input_layer_results)
-        self.layers = []
+        self.layers_configs = np.array([_input_layer_configs])
+        self.layers_results = np.array([_input_layer_results])
+        self.layers = np.array([])
 
     def build_layers(self, layers):
         if isinstance(layers, Layer):
@@ -110,7 +111,7 @@ class Network(object):
         if optimizer is None:
             self._lr = 0.001
             optimizer = tfnn.train.GradientDescentOptimizer(self._lr)
-        if self.layers_configs['type'].iloc[-1] != 'output':
+        if self.layers_configs[-1]['type'] != 'output':
             raise NotImplementedError('Please add output layer.')
         with tfnn.name_scope('trian'):
             if hasattr(optimizer, '_lr'):
@@ -249,9 +250,9 @@ class Network(object):
     def _add_to_log(self, layer):
         _layer_configs_dict = layer.configs_dict
         _layer_results_dict = layer.results_dict
-        self.layers_configs = self.layers_configs.append(_layer_configs_dict, ignore_index=True)
-        self.layers_results = self.layers_results.append(_layer_results_dict, ignore_index=True)
-        self.layers.append(layer)
+        self.layers_configs = np.append(self.layers_configs, _layer_configs_dict)
+        self.layers_results = np.append(self.layers_results, _layer_results_dict)
+        self.layers = np.append(self.layers, layer)
 
     def _init_loss(self):
         """do not use in network.py"""

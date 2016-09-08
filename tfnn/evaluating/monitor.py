@@ -6,7 +6,6 @@ class Monitor(object):
         self.evaluator = evaluator
         self.name = name
 
-
     def monitoring(self, *args, **kwargs):
         pass
 

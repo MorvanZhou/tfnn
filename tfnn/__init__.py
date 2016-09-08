@@ -4,8 +4,8 @@ from __future__ import print_function
 
 from tensorflow import *
 from tfnn.datasets.data import Data
-from tfnn.body.regression_network import RegNetwork
-from tfnn.body.classifiction_network import ClfNetwork
+from tfnn.body.reg_network import RegNetwork
+from tfnn.body.clf_network import ClfNetwork
 from tfnn.body.norm_layer import FCLayer, HiddenLayer, OutputLayer
 from tfnn.body.conv_layer import ConvLayer
 from tfnn.body.network_saver import NetworkSaver

@@ -8,8 +8,10 @@ class LayerMonitor(Monitor):
     def __init__(self, grid_space, objects, evaluator, figsize=(13, 13), cbar_range=(-1, 1), cmap='rainbow',
                  sleep=0.001):
         super(LayerMonitor, self).__init__(evaluator, 'layer_monitor')
-        if self.evaluator.network.layers_configs['type'].isin(['conv']).any():
-            # TODO: add Conv layer support
+        # TODO: add Conv layer support
+        _layer_types = []
+        [_layer_types.append(_l['type']) for _l in self.evaluator.network.layers_configs]
+        if 'conv' in _layer_types:
             raise NotImplementedError('Convolutional layer is not supported at the moment')
         self._network = self.evaluator.network
         self._objects = objects
@@ -20,7 +22,7 @@ class LayerMonitor(Monitor):
         self._axes = {}
         self._images_axes = {}
         self._1st_images = True
-        neural_structure = self._network.layers_configs['neural_structure']
+        self._outputs4run = [l['activated'] for l in self._network.layers_results[1:]]
 
         # for input layer
         res_name = 'input'
@@ -30,7 +32,7 @@ class LayerMonitor(Monitor):
                                          labelbottom='off', labelleft='off', )
         self._axes[res_name].grid(False)
         self._axes[res_name].set_title(r'$%s$' % res_name)
-        res_x_label = neural_structure.iloc[1]['input_size']
+        res_x_label = self._network.layers_configs[1]['neural_structure']['input_size']
         self._axes[res_name].set_xlabel(r'$%i\ inputs$' % res_x_label)
 
         # color bar setting
@@ -59,21 +61,20 @@ class LayerMonitor(Monitor):
             self._axes[W_name].set_title(r'$%s$' % W_name)
             self._axes[res_name].set_title(r'$%s$' % res_name)
 
-            W_y_label = neural_structure.iloc[name+1]['input_size']
-            W_x_label = neural_structure.iloc[name+1]['output_size']
+            W_y_label = self._network.layers_configs[name+1]['neural_structure']['input_size']
+            W_x_label = self._network.layers_configs[name+1]['neural_structure']['output_size']
             res_x_label = W_x_label
             self._axes[W_name].set_ylabel(r'$%i\ inputs$' % W_y_label)
             self._axes[W_name].set_xlabel(r'$%i\ outputs$' % W_x_label)
             self._axes[res_name].set_xlabel(r'$%i\ neurons$' % res_x_label)
         self._fig.subplots_adjust(hspace=0.4)
-
         plt.ion()
         plt.show()
 
     def monitoring(self, t_xs, t_ys):
         all_Ws = self._network.get_W()
         feed_dict = self.evaluator.get_feed_dict(t_xs, t_ys)
-        all_outputs = self._network.sess.run(list(self._network.layers_results['activated'].values)[1:],
+        all_outputs = self._network.sess.run(self._outputs4run,
                                              feed_dict=feed_dict)
         # for 1st layer
         res_name = 'input'

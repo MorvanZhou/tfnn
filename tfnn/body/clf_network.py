@@ -16,18 +16,18 @@ class ClfNetwork(Network):
     def _init_loss(self):
         with tfnn.name_scope('predictions'):
             if self.method == 'softmax':
-                self.predictions = tfnn.nn.softmax(self.layers_results['final'].iloc[-1], name='predictions')
+                self.predictions = tfnn.nn.softmax(self.layers_results[-1]['final'], name='predictions')
             elif self.method == 'sigmoid':
-                self.predictions = tfnn.nn.sigmoid(self.layers_results['final'].iloc[-1], name='predictions')
+                self.predictions = tfnn.nn.sigmoid(self.layers_results[-1]['final'], name='predictions')
         with tfnn.name_scope('loss'):
             if self.method == 'softmax':
                 self.cross_entropy = tfnn.nn.softmax_cross_entropy_with_logits(
-                    self.layers_results['final'].iloc[-1],
+                    self.layers_results[-1]['final'],
                     self.target_placeholder,
                     name='xentropy')
             elif self.method == 'sigmoid':
                 self.cross_entropy = tfnn.nn.sigmoid_cross_entropy_with_logits(
-                    self.layers_results['final'].iloc[-1],
+                    self.layers_results[-1]['final'],
                     self.target_placeholder,
                     name='xentropy')
             else:

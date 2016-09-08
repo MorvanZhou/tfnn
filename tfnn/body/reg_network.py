@@ -12,7 +12,7 @@ class RegNetwork(Network):
 
     def _init_loss(self):
         with tfnn.name_scope('predictions'):
-            self.predictions = self.layers_results['final'].iloc[-1]
+            self.predictions = self.layers_results[-1]['final']
         with tfnn.name_scope('loss'):
             loss_square = tfnn.square(self.target_placeholder - self.predictions,
                                       name='loss_square')

@@ -22,7 +22,7 @@ class Layer(object):
 
     def _construct(self, n_neurons, layers_configs, layers_results):
         self.name = self._check_name(layers_configs)
-        _input_size = layers_configs['neural_structure'].iloc[-1]['output_size']  # this is from last layer
+        _input_size = layers_configs[-1]['neural_structure']['output_size']  # this is from last layer
         with tfnn.variable_scope(self.name):
 
             with tfnn.variable_scope('weights') as weights_scope:
@@ -49,7 +49,7 @@ class Layer(object):
                 tfnn.histogram_summary(self.name + '/biases', self.b)
 
             with tfnn.name_scope('Wx_plus_b'):
-                product = tfnn.add(tfnn.matmul(layers_results['final'].iloc[-1], self.W, name='Wx'),
+                product = tfnn.add(tfnn.matmul(layers_results[-1]['final'], self.W, name='Wx'),
                                    self.b, name='Wx_add_b')
 
             if self.activator is None:
@@ -60,9 +60,9 @@ class Layer(object):
                 activated_product = self.activator(product)
             tfnn.histogram_summary(self.name + '/activated_product', activated_product)
 
-            _reg = layers_configs['para'].iloc[0]['reg']
+            _reg = layers_configs[0]['para']['reg']
             if (_reg == 'dropout') and self.dropout_layer:
-                _keep_prob = layers_configs['para'].iloc[0]['keep_prob']
+                _keep_prob = layers_configs[0]['para']['keep_prob']
                 dropped_product = tfnn.nn.dropout(activated_product,
                                                   _keep_prob,
                                                   name='dropout')
@@ -88,38 +88,31 @@ class Layer(object):
              'final': final_product}
 
     def _check_name(self, layers_configs):
-        if self.layer_type == 'hidden':
-            if self.name is None:
+        if self.name is None:
+            if self.layer_type == 'hidden':
                 layer_name = 'hidden_layer'
-            else:
-                layer_name = self.name
-        elif self.layer_type == 'output':
-            if self.name is None:
+            elif self.layer_type == 'output':
                 layer_name = 'output_layer'
-            else:
-                layer_name = self.name
-        elif self.layer_type == 'fc':
-            if self.name is None:
+            elif self.layer_type == 'fc':
                 layer_name = 'fc_layer'
-            else:
-                layer_name = self.name
-        elif self.layer_type == 'conv':
-            if self.name is None:
+            elif self.layer_type == 'conv':
                 layer_name = 'conv_layer'
             else:
-                layer_name = self.name
+                raise ValueError('layer_type not support %s' % self.layer_type)
         else:
-            raise ValueError('layer_type not support %s' % self.layer_type)
+            layer_name = self.name
 
         # check repeated name
-        if layers_configs['name'].isin([layer_name]).any():
-            _counter = 0
-            while True:
-                _counter += 1
-                new_layer_name = layer_name + '_%i' % _counter
-                if not layers_configs['name'].isin([new_layer_name]).any():
-                    layer_name = new_layer_name
-                    break
+        all_layer_names = []
+        [all_layer_names.append(l['name']) for l in layers_configs]
+        layer_name_copy = layer_name
+        _counter = 0
+        while layer_name_copy in all_layer_names:
+            _counter += 1
+            layer_name_copy = layer_name + '_%i' % _counter
+            if layer_name_copy not in all_layer_names:
+                layer_name = layer_name_copy
+                break
         return layer_name
 
     @staticmethod

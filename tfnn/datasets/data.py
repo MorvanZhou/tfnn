@@ -17,6 +17,7 @@ class Data:
         :param xs: data, shape(n_xs, n_samples), (pd.DataFrame)
         :param ys: labels, shape(n_ys, n_samples), (pd.DataFrame)
         """
+        # TODO: try only use numpy and tfnn tensor
         if ('numpy' in type(xs).__module__) & ('numpy' in type(ys).__module__):
             xs = pd.DataFrame(xs)
             ys = pd.DataFrame(ys)

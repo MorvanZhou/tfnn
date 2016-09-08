@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-import pandas as pd
 from tfnn.evaluating.monitor import Monitor
 
 
@@ -55,6 +54,7 @@ class ScoreMonitor(Monitor):
 
         if not hasattr(self, '_t_logs'):
             self._epoch = [global_step]
+            # TODO:get rid of pd
             self._t_logs = pd.DataFrame(columns=object_names)
             self._t_logs = self._t_logs.append(t_results, ignore_index=True)
             if v_xs is not None:

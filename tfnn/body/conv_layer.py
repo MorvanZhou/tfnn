@@ -65,7 +65,7 @@ class ConvLayer(Layer):
         self._check_image_shape(layers_configs, layers_results)
         self.name = self._check_name(layers_configs)
         # in conv, the _in_size should be the [length, width, channels]
-        _in_size = layers_configs['neural_structure'].iloc[-1]['output_size']
+        _in_size = layers_configs[-1]['neural_structure']['output_size']
         with tfnn.variable_scope(self.name):
             with tfnn.variable_scope('weights') as weights_scope:
                 self.W = self._weight_variable([
@@ -104,7 +104,7 @@ class ConvLayer(Layer):
 
             with tfnn.name_scope('Wx_plus_b'):
                 product = tfnn.nn.conv2d(
-                    input=layers_results['final'].iloc[-1],
+                    input=layers_results[-1]['final'],
                     filter=self.W,
                     strides=[1, self.strides[0], self.strides[1], 1],
                     padding=self.padding) \
@@ -124,9 +124,9 @@ class ConvLayer(Layer):
                 image=activated_product, layer_size=_in_size, n_filters=self.n_filters)
             tfnn.histogram_summary(self.name + '/pooled_product', pooled_product)
 
-        _reg = layers_configs['para'].iloc[0]['reg']
+        _reg = layers_configs[0]['para']['reg']
         if (_reg == 'dropout') and self.dropout_layer:
-            _keep_prob = layers_configs['para'].iloc[0]['keep_prob']
+            _keep_prob = layers_configs[0]['para']['keep_prob']
             dropped_product = tfnn.nn.dropout(
                 pooled_product,
                 _keep_prob,
@@ -168,13 +168,13 @@ class ConvLayer(Layer):
                     raise ValueError('image_shape can only be a tuple or list')
 
                 # image shape have to be (x, y, channel)
-                layers_configs['neural_structure'].iloc[-1]['output_size'] = self.image_shape
-                _xs_placeholder = layers_results['final'].iloc[-1]
+                layers_configs[-1]['neural_structure']['output_size'] = self.image_shape
+                _xs_placeholder = layers_results[-1]['final']
                 replaced_image_shape = self.image_shape.copy()
                 replaced_image_shape.insert(0, -1)
                 with tfnn.name_scope('reshape_inputs'):
                     _image_placeholder = tfnn.reshape(_xs_placeholder, replaced_image_shape)
-                layers_results['activated'].iloc[-1] = _image_placeholder
-                layers_results['final'].iloc[-1] = _image_placeholder
+                layers_results[-1]['activated'] = _image_placeholder
+                layers_results[-1]['final'] = _image_placeholder
             else:
                 raise IndexError('This is not the first conv layer, leave image_shape as default')
