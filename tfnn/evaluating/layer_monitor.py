@@ -8,6 +8,9 @@ class LayerMonitor(Monitor):
     def __init__(self, grid_space, objects, evaluator, figsize=(13, 13), cbar_range=(-1, 1), cmap='rainbow',
                  sleep=0.001):
         super(LayerMonitor, self).__init__(evaluator, 'layer_monitor')
+        if self.evaluator.network.layers_configs['type'].isin(['conv']).any():
+            # TODO: add Conv layer support
+            raise NotImplementedError('Convolutional layer is not supported at the moment')
         self._network = self.evaluator.network
         self._objects = objects
         self._cbar_range = cbar_range
@@ -21,7 +24,7 @@ class LayerMonitor(Monitor):
 
         # for input layer
         res_name = 'input'
-        self._axes[res_name] = plt.subplot2grid(grid_space, (0, 1), )
+        self._axes[res_name] = plt.subplot2grid(grid_space, (1, 0), )
         self._axes[res_name].tick_params(axis='both', which='both',
                                          bottom='off', top='off', left='off', right='off',
                                          labelbottom='off', labelleft='off', )
@@ -31,20 +34,20 @@ class LayerMonitor(Monitor):
         self._axes[res_name].set_xlabel(r'$%i\ inputs$' % res_x_label)
 
         # color bar setting
-        self._cbar_ax = self._fig.add_axes([0.08, 0.83, 0.4, 0.02])
+        self._cbar_ax = self._fig.add_axes([0.17, 0.6, 0.02, 0.27])
         norm = mpl.colors.Normalize(vmin=cbar_range[0], vmax=cbar_range[1])
         cb1 = mpl.colorbar.ColorbarBase(self._cbar_ax, cmap=self._cmap,
                                         norm=norm,
-                                        orientation='horizontal',
+                                        orientation='vertical',
                                         ticks=[self._cbar_range[0], np.mean(self._cbar_range), self._cbar_range[1]],
                                         label=r'$Weights\ value$')
 
-        for r_loc, name in enumerate(objects):
+        for c_loc, name in enumerate(objects):
             W_name = 'W_' + str(name+1)
             res_name = 'output_' + str(name+1)
 
-            self._axes[W_name] = plt.subplot2grid(grid_space, (r_loc+1, 0),)
-            self._axes[res_name] = plt.subplot2grid(grid_space, (r_loc+1, 1),)
+            self._axes[W_name] = plt.subplot2grid(grid_space, (0, c_loc+1),)
+            self._axes[res_name] = plt.subplot2grid(grid_space, (1, c_loc+1),)
             self._axes[W_name].tick_params(axis='both', which='both',
                                            bottom='off', top='off', left='off', right='off',
                                            labelbottom='off', labelleft='off',)
@@ -68,8 +71,7 @@ class LayerMonitor(Monitor):
         plt.show()
 
     def monitoring(self, t_xs, t_ys):
-
-        all_Ws = self._network.sess.run(list(self._network.Ws.values))
+        all_Ws = self._network.get_W()
         feed_dict = self.evaluator.get_feed_dict(t_xs, t_ys)
         all_outputs = self._network.sess.run(list(self._network.layers_results['activated'].values)[1:],
                                              feed_dict=feed_dict)

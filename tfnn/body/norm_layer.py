@@ -25,6 +25,9 @@ class OutputLayer(Layer):
         self.n_neurons = None
 
     def construct(self, layers_configs, layers_results):
+        net_type = layers_configs['para'].iloc[0]['ntype']
+        if (net_type == 'CNet') and (self.activator is not None):
+            raise AttributeError('The activator in output layer for classification neural network has to be None')
         self.n_neurons = layers_configs['net_in_out'].iloc[0]['output_size']
         self._construct(self.n_neurons, layers_configs, layers_results)
 

@@ -11,6 +11,15 @@ class Layer(object):
         self.name = name
         self.layer_type = layer_type
 
+    def construct(self, *args, **kwargs):
+        raise NotImplementedError("Abstract method")
+
+    def get_Wshape(self):
+        return self.W.get_shape()
+
+    def get_bshape(self):
+        return self.b.get_shape()
+
     def _construct(self, n_neurons, layers_configs, layers_results):
         self.name = self._check_name(layers_configs)
         _input_size = layers_configs['neural_structure'].iloc[-1]['output_size']  # this is from last layer
@@ -72,7 +81,8 @@ class Layer(object):
              'para': {'n_neurons': n_neurons, 'activator': activator_name,
                       'dropout_layer': self.dropout_layer, 'name': self.name, 'w_initial': self.w_initial}}
         self.results_dict = \
-            {'Wx_plus_b': product,
+            {'Layer': self,
+             'Wx_plus_b': product,
              'activated': activated_product,
              'dropped': dropped_product,
              'final': final_product}

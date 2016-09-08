@@ -9,7 +9,7 @@ class ClfNetwork(Network):
         if method not in ['softmax', 'sigmoid']:
             raise ValueError("method should be one of ['softmax', 'sigmoid']")
         super(ClfNetwork, self).__init__(
-            input_size, output_size, do_dropout, do_l2)
+            input_size, output_size, do_dropout, do_l2, ntype='CNet')
         self.method = method
         self.name = 'ClassificationNetwork'
 
@@ -37,8 +37,8 @@ class ClfNetwork(Network):
             if self.reg == 'l2':
                 with tfnn.name_scope('l2_reg'):
                     regularizers = 0
-                    for W in self.Ws:
-                        regularizers += tfnn.nn.l2_loss(W, name='l2_reg')
+                    for layer in self.layers:
+                        regularizers += tfnn.nn.l2_loss(layer.W, name='l2_reg')
                     regularizers *= self.l2_placeholder
                 with tfnn.name_scope('l2_loss'):
                     self.loss += regularizers

@@ -33,6 +33,7 @@ class Evaluator(object):
                 tfnn.scalar_summary('r2_score', self.r2)
 
         if isinstance(self.network, tfnn.ClfNetwork):
+            # TODO: Fix f1 score
             with tfnn.name_scope('f1_score'):
                 predictions = tfnn.argmax(network.predictions, 1)
                 actuals = tfnn.argmax(network.target_placeholder, 1)
@@ -115,10 +116,10 @@ class Evaluator(object):
         self.score_monitor = ScoreMonitor(grid_space, objects, self, figsize, sleep)
         return self.score_monitor
 
-    def set_layer_monitor(self, objects, figsize=(13, 13), cbar_range=(-1, 1), cmap='rainbow',
+    def set_layer_monitor(self, objects, figsize=(13, 10), cbar_range=(-1, 1), cmap='rainbow',
                           sleep=0.001):
         if isinstance(objects, (tuple, list)):
-            grid_space = (len(objects)+1, 2)
+            grid_space = (2, len(objects)+1)
         else:
             raise ValueError("""objects should be a a list or dictionary. A list of layer index like
                                 [0, 1, 3].

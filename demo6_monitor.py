@@ -30,13 +30,13 @@ out = tfnn.OutputLayer(activator=None)
 network.build_layers([h1, h2, h3, out])
 
 # set optimizer. Default GradientDescent
-network.set_optimizer(tfnn.train.GradientDescentOptimizer(0.0001))
+network.set_optimizer(tfnn.train.GradientDescentOptimizer(0.001))
 
 # set evaluator for compute the accuracy, loss etc.
 evaluator = tfnn.Evaluator(network)
 
 # set Layer Monitor for instantly plot weights and outputs results
-evaluator.set_layer_monitor([0, 1, ], figsize=(8, 8))  # [0, 1] represents the 0th layer and 1st layer
+evaluator.set_layer_monitor([0, 1, ], figsize=(8, 7))  # [0, 1] represents the 0th layer and 1st layer
 
 # train network
 for step in range(400):

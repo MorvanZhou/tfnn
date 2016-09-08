@@ -7,7 +7,7 @@ class RegNetwork(Network):
     def __init__(self, input_size, output_size, do_dropout=False, do_l2=False):
 
         super(RegNetwork, self).__init__(
-            input_size, output_size, do_dropout, do_l2)
+            input_size, output_size, do_dropout, do_l2, ntype='RNet')
         self.name = 'RegressionNetwork'
 
     def _init_loss(self):
@@ -22,8 +22,8 @@ class RegNetwork(Network):
             if self.reg == 'l2':
                 with tfnn.name_scope('l2_reg'):
                     regularizers = 0
-                    for W in self.Ws:
-                        regularizers += tfnn.nn.l2_loss(W, name='l2_reg')
+                    for layer in self.layers:
+                        regularizers += tfnn.nn.l2_loss(layer.W, name='l2_reg')
                     regularizers *= self.l2_placeholder
                 with tfnn.name_scope('l2_loss'):
                     self.loss += regularizers

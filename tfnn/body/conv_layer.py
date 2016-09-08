@@ -120,7 +120,6 @@ class ConvLayer(Layer):
 
         # pooling process
         with tfnn.name_scope('pooling'):
-
             pooled_product, _out_size = self.pooling_layer.pool(
                 image=activated_product, layer_size=_in_size, n_filters=self.n_filters)
             tfnn.histogram_summary(self.name + '/pooled_product', pooled_product)
@@ -151,6 +150,7 @@ class ConvLayer(Layer):
                      'pool_padding': self.pool_padding, 'dropout_layer': self.dropout_layer,
                      'image_shape': self.image_shape, 'w_initial': self.w_initial, 'name': self.name, }}
         self.results_dict = {
+            'Layer': self,
             'Wx_plus_b': product,
             'activated': activated_product,
             'dropped': dropped_product,
