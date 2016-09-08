@@ -94,7 +94,8 @@ class LayerMonitor(Monitor):
             else:
                 self._images_axes[W_name].set_data(all_Ws[name])
                 self._images_axes[res_name].set_data(all_outputs[name])
-
+                # self._fig.canvas.blit(self._axes[W_name].bbox)
+                # self._fig.canvas.blit(self._axes[res_name].bbox)
             res_y_label = len(all_outputs[name])
             self._axes[res_name].set_ylabel(r'$batch\ size:%i$' % res_y_label)
         # self._fig.canvas.draw()

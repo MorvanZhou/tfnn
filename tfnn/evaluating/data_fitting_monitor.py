@@ -44,7 +44,7 @@ class DataFittingMonitor(Monitor):
         offset = 0.1 * (y_real_max[0] - y_real_min[0])
         self._ax.set_ylim([y_real_min[0] - offset, y_real_max[0] + offset])
         self._ax.set_xlim([y_real_min[0] - offset, y_real_max[0] + offset])
-
+        self._fig.canvas.blit(self._ax.bbox)
         self._fig.canvas.draw()
         self._fig.canvas.flush_events()
         plt.pause(self._sleep)

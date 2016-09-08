@@ -16,8 +16,8 @@ ys = load_boston().target
 # xs = fetch_olivetti_faces().data
 # ys = fetch_olivetti_faces().target[:, np.newaxis]
 
-xs = np.linspace(-5, 5, 300)[:, np.newaxis]
-ys = xs**2
+# xs = np.linspace(-5, 5, 300)[:, np.newaxis]
+# ys = xs**2
 
 data = tfnn.Data(xs, ys)
 data.shuffle(inplace=True)
@@ -36,10 +36,10 @@ network.build_layers([h1, h2, out])
 optimizer = tfnn.train.GradientDescentOptimizer(0.001)
 network.set_optimizer(optimizer)
 evaluator = tfnn.Evaluator(network)
-evaluator.set_line_fitting_monitor()
-evaluator.set_data_fitting_monitor()
+# evaluator.set_line_fitting_monitor()
+# evaluator.set_data_fitting_monitor()
 # evaluator.set_score_monitor(['cost', 'r2'], figsize=(5, 5))
-# evaluator.set_layer_monitor([0, 1, 2], figsize=(10, 10), cbar_range=(-0.4, 0.4))
+evaluator.set_layer_monitor([0, 1, 2], figsize=(10, 10), cbar_range=(-0.4, 0.4))
 # write summarizer at the end of the structure
 # summarizer = tfnn.Summarizer(network, save_path='tmp',)
 st = time.time()

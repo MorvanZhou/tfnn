@@ -86,8 +86,7 @@ class ScoreMonitor(Monitor):
 
         if len(self._t_logs) >= 2:
             for _name in object_names:
-                self._tplot_axes[_name].set_xdata(self._epoch)
-                self._tplot_axes[_name].set_ydata(self._t_logs[_name].values)
+                self._tplot_axes[_name].set_data(self._epoch, self._t_logs[_name].values)
                 if v_xs is not None:
                     self._vplot_axes[_name].set_data(self._epoch, self._v_logs[_name].values)
                 self._axes[_name].relim()
