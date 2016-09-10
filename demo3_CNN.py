@@ -24,8 +24,8 @@ network.add_fc_layer(1024, tfnn.nn.relu, dropout_layer=True)
 network.add_output_layer()
 
 # choose optimizer
-optimizer = tfnn.train.AdamOptimizer(1e-4)
-network.set_optimizer(optimizer)
+network.set_optimizer(optimizer='adam')
+network.set_learning_rate(0.01)
 
 # set evaluator
 evaluator = tfnn.Evaluator(network)
@@ -40,7 +40,7 @@ for i in range(1000):
     if i % 10 == 0:
         # record
         print('accuracy:', evaluator.compute_accuracy(b_xs, b_ys))
-        summarizer.record_train(b_xs, b_ys, i, 0.5)
+        summarizer.record_train(b_xs, b_ys)
 
 # visualize it on tensorborad
 summarizer.web_visualize()

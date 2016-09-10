@@ -3,8 +3,8 @@ import pandas as pd
 
 
 class BinaryEncoder(object):
-    @staticmethod
-    def encode_target(data, columns=None, inplace=False):
+
+    def encode_target(self, data, columns=None, inplace=False):
         """
         1-of-C dummy-coding the categorical target data.
         :param data:
@@ -12,8 +12,7 @@ class BinaryEncoder(object):
         :param inplace:
         :return:
         """
-        result = pd.get_dummies(data.ys, columns=columns)
-
+        result = self.numpy_1_of_k(data.ys, )
         if inplace:
             data.ys = result
             return None
@@ -37,13 +36,24 @@ class BinaryEncoder(object):
         else:
             return result
 
+    @staticmethod
+    def numpy_1_of_k(seq):
+        unique_num, indices, n_classes = np.unique(seq, return_inverse=True, return_counts=True)
+        n_samples = len(seq)
+        one_hot = np.zeros((n_samples, n_classes))
+        one_hot[np.arange(n_samples), indices] = 1
+        return one_hot
+
 
 if __name__ == '__main__':
-    class Data:
-        xs = pd.DataFrame({'a': ['d', 'f', 'm', 'm'], 'b': [1.2, 2, 3, 4], 'c': ['d','a','a','d']})
-        ys = pd.DataFrame({'a': ['m', 'f', 'f', 's']})
-        n_samples = 4
+    def numpy_1_of_k(seq):
+        unique_num, indices= np.unique(seq, return_inverse=True)
+        n_samples = len(seq)
+        n_classes = len(unique_num)
+        one_hot = np.zeros((n_samples, n_classes))
+        one_hot[np.arange(n_samples), indices] = 1
+        return one_hot
 
-    data = Data()
-    print(data.xs.dtypes)
-    print(pd.get_dummies(data.xs, columns=['a'], drop_first=True))
+    d = np.array([[1,1],[2,2]])
+    print(numpy_1_of_k(d))
+

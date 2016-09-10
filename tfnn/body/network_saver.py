@@ -118,12 +118,12 @@ class NetworkSaver(object):
         if data_config is not None:
             network.normalizer.set_config(data_config)
         # set each layer
-        for index, layer_configs in enumerate(layers_configs):
+        for index in range(len(layers_configs['type'])):
             if index == 0:
                 continue
-            para = layer_configs['para']
+            para = layers_configs['para'][index]
             layer_activator = para['activator']
-            layer_type = layer_configs['type']
+            layer_type = layers_configs['type'][index]
 
             if layer_activator is None:
                 activator = None

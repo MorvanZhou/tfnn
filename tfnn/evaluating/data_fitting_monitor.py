@@ -14,12 +14,12 @@ class DataFittingMonitor(Monitor):
         self._scat = self._ax.scatter(
             [], [],
             label=r'$predicted$',
-            c='#9999ff',      # blue like
-            s=30, alpha=0.8, edgecolor='none')
+            c=self.color_test,      # blue like
+            s=30, alpha=0.6, edgecolor='none')
         self._real_line, = self._ax.plot(
             [None, None], [None, None],
             ls='--', lw=3,
-            c='#ff9999',        # red like
+            c=self.color_train,        # red like
             label=r'$real$')
         self._ax.grid(True)
         self._ax.legend(loc='upper left')

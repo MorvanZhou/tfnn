@@ -9,9 +9,7 @@ class LayerMonitor(Monitor):
                  sleep=0.001):
         super(LayerMonitor, self).__init__(evaluator, 'layer_monitor')
         # TODO: add Conv layer support
-        _layer_types = []
-        [_layer_types.append(_l['type']) for _l in self.evaluator.network.layers_configs]
-        if 'conv' in _layer_types:
+        if 'conv' in self.evaluator.network.layers_configs['type']:
             raise NotImplementedError('Convolutional layer is not supported at the moment')
         self._network = self.evaluator.network
         self._objects = objects
@@ -22,7 +20,7 @@ class LayerMonitor(Monitor):
         self._axes = {}
         self._images_axes = {}
         self._1st_images = True
-        self._outputs4run = [l['activated'] for l in self._network.layers_results[1:]]
+        self._outputs4run = self._network.layers_results['final'][1:]
 
         # for input layer
         res_name = 'input'
@@ -32,7 +30,7 @@ class LayerMonitor(Monitor):
                                          labelbottom='off', labelleft='off', )
         self._axes[res_name].grid(False)
         self._axes[res_name].set_title(r'$%s$' % res_name)
-        res_x_label = self._network.layers_configs[1]['neural_structure']['input_size']
+        res_x_label = self._network.layers_configs['neural_structure'][-1]['input_size']
         self._axes[res_name].set_xlabel(r'$%i\ inputs$' % res_x_label)
 
         # color bar setting
@@ -45,6 +43,8 @@ class LayerMonitor(Monitor):
                                         label=r'$Weights\ value$')
 
         for c_loc, name in enumerate(objects):
+            if name+2 >= len(self._network.layers_configs):
+                raise ValueError('Do not have layer index %i' % name)
             W_name = 'W_' + str(name+1)
             res_name = 'output_' + str(name+1)
 
@@ -61,8 +61,8 @@ class LayerMonitor(Monitor):
             self._axes[W_name].set_title(r'$%s$' % W_name)
             self._axes[res_name].set_title(r'$%s$' % res_name)
 
-            W_y_label = self._network.layers_configs[name+1]['neural_structure']['input_size']
-            W_x_label = self._network.layers_configs[name+1]['neural_structure']['output_size']
+            W_y_label = self._network.layers_configs['neural_structure'][name+1]['input_size']
+            W_x_label = self._network.layers_configs['neural_structure'][name+1]['output_size']
             res_x_label = W_x_label
             self._axes[W_name].set_ylabel(r'$%i\ inputs$' % W_y_label)
             self._axes[W_name].set_xlabel(r'$%i\ outputs$' % W_x_label)

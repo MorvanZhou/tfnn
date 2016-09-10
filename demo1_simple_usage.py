@@ -8,7 +8,7 @@ mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 network = tfnn.ClfNetwork(input_size=mnist.train.images.shape[1], output_size=mnist.train.labels.shape[1])
 
 # add hidden layer
-network.add_hidden_layer(n_neurons=20, activator=tfnn.nn.relu)
+network.add_hidden_layer(n_neurons=100, activator=tfnn.nn.relu)
 
 # add output layer
 network.add_output_layer(activator=None)

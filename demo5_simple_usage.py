@@ -29,20 +29,23 @@ out = tfnn.OutputLayer(activator=None)
 network.build_layers([h1, h2, out])
 
 # set optimizer. Default GradientDescent
-network.set_optimizer(tfnn.train.GradientDescentOptimizer(0.0001))
+network.set_optimizer('GD')
+
+# set learning rate
+network.set_learning_rate(0.0001)
 
 # set evaluator for compute the accuracy, loss etc.
 evaluator = tfnn.Evaluator(network)
 
 # set Score Monitor for live plot
-evaluator.set_score_monitor(['r2', 'cost'])
+evaluator.set_scale_monitor(['r2', 'cost'])
 
 # train network
 for step in range(400):
     b_xs, b_ys = t_data.next_batch(20, loop=True)
     network.run_step(b_xs, b_ys)
     if step % 10 == 0:
-        evaluator.monitoring(b_xs, b_ys, global_step=step, v_xs=v_data.xs, v_ys=v_data.ys)
+        evaluator.monitoring(b_xs, b_ys, v_xs=v_data.xs, v_ys=v_data.ys)
 evaluator.hold_plot()
 
 

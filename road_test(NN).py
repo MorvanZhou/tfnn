@@ -48,7 +48,6 @@ def train(data_path, duration, save_to='/tmp/'):
             print(evaluator.compute_cost(v_data.xs, v_data.ys))
             summarizer.record_train(b_xs, b_ys, i, 0.5)
             summarizer.record_test(v_data.xs, v_data.ys, i)
-            # evaluator.plot_regression_linear_comparison(v_data.xs, v_data.ys, continue_plot=True)
     network.save(path='tmp', name=save_to, replace=True)
     network.sess.close()
     evaluator.hold_plot()
@@ -465,11 +464,11 @@ if __name__ == '__main__':
     # tfnn.set_random_seed(11)
     # np.random.seed(11)
     which_lane = [1, 3, 4]
-    path = ['datasets/I80-0400_lane%i.pickle' % lane for lane in which_lane]
+    path = ['preprocessing/I80-0400_lane%i.pickle' % lane for lane in which_lane]
     duration = 1
     train(path, duration, save_to='/model%i/' % int(duration*10))
 
-    # test_path = 'datasets/I80-0400_lane2.pickle'
+    # test_path = 'preprocessing/I80-0400_lane2.pickle'
     # compare_real(test_path, duration, model_path='tmp', model='/model%i/' % int(duration*10))
 
     # test(duration,  model_path='tmp', model='/model%i/' % int(duration*10))
@@ -477,7 +476,7 @@ if __name__ == '__main__':
     # cross_validation(path)
 
     # 512, 517, 418, 121, 191, 242, 392
-    lane_path = 'datasets/I80-0400_lane2.pickle'
+    lane_path = 'preprocessing/I80-0400_lane2.pickle'
     traj_comparison(lane_path, duration, id=890, model='/model%i/' % int(duration*10),
                     on_test=True, predict='v')
     # oscillation(lane_path, duration, id=890, model='/model%i/' % int(duration*10))

@@ -21,7 +21,7 @@ network.add_hidden_layer(n_neurons=20, activator=tfnn.nn.relu)
 network.add_output_layer(activator=None)
 
 # set optimizer. Default GradientDescent
-network.set_optimizer(optimizer=tfnn.train.AdamOptimizer(1e-3))
+network.set_optimizer(optimizer='adam')
 
 # set evaluator for compute the accuracy, loss etc.
 evaluator = tfnn.Evaluator(network)

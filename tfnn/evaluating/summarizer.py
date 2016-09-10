@@ -4,8 +4,7 @@ import tfnn
 
 
 class Summarizer(object):
-    def __init__(self, network=None, save_path='/tmp', include_test=False):
-        self._include_test = include_test
+    def __init__(self, network=None, save_path='/tmp',):
         if network is not None:
             self._network = network
             check_dir = os.getcwd() + save_path
@@ -20,32 +19,29 @@ class Summarizer(object):
             if self._folder in os.listdir(self.save_path):
                 shutil.rmtree(self.save_path+'/' + self._folder)
             self.merged = tfnn.merge_all_summaries()
-            self.train_writer = tfnn.train.SummaryWriter(self.save_path + '/' + self._folder + '/train',
-                                                         network.sess.graph)
-            if include_test:
-                self.test_writer = tfnn.train.SummaryWriter(self.save_path + '/' + self._folder + '/test', )
 
-    def record_train(self, t_xs, t_ys, global_step, *args):
+    def record_train(self, t_xs, t_ys,):
+        if not hasattr(self, 'train_writer'):
+            self.train_writer = tfnn.train.SummaryWriter(self.save_path + '/' + self._folder + '/train',
+                                                         self._network.sess.graph)
         if self._network.reg == 'dropout':
-            if len(args) != 1:
-                raise ValueError('Do not find keep_prob value.')
-            keep_prob = args[0]
-            l2_lambda = 0.
+            value_pass_in = self._network.sess.run(self._network.keep_prob)
         elif self._network.reg == 'l2':
-            if len(args) != 1:
-                raise ValueError('Do not find l2_lambda value.')
-            keep_prob = 1.
-            l2_lambda = args[0]
-        else:
-            keep_prob, l2_lambda = 1., 0.
-        feed_dict = self._get_feed_dict(t_xs, t_ys, keep=keep_prob, l2=l2_lambda)
+            value_pass_in = self._network.sess.run(self._network.l2_value)
+        global_step = self._network.sess.run(self._network.global_step)
+        feed_dict = self._get_feed_dict(t_xs, t_ys, value_pass_in)
         train_result = self._network.sess.run(self.merged, feed_dict)
         self.train_writer.add_summary(train_result, global_step)
 
-    def record_test(self, v_xs, v_ys, global_step):
-        if not self._include_test:
-            raise ReferenceError('Set tfnn.Summarizer(include_test=True) to record test')
-        feed_dict = self._get_feed_dict(v_xs, v_ys, keep=1., l2=0.)
+    def record_test(self, v_xs, v_ys):
+        if not hasattr(self, 'test_writer'):
+            self.test_writer = tfnn.train.SummaryWriter(self.save_path + '/' + self._folder + '/test', )
+        if self._network.reg == 'dropout':
+            value_pass_in = 1.
+        elif self._network.reg == 'l2':
+            value_pass_in = 0.
+        global_step = self._network.sess.run(self._network.global_step)
+        feed_dict = self._get_feed_dict(v_xs, v_ys, value_pass_in)
         test_result = self._network.sess.run(self.merged, feed_dict)
         self.test_writer.add_summary(test_result, global_step)
 
@@ -60,15 +56,15 @@ class Summarizer(object):
                 path = path[1:]
             os.system('tensorboard --logdir=%s' % path)
 
-    def _get_feed_dict(self, xs, ys, keep, l2):
+    def _get_feed_dict(self, xs, ys, *args):
         if self._network.reg == 'dropout':
             feed_dict = {self._network.data_placeholder: xs,
                          self._network.target_placeholder: ys,
-                         self._network.keep_prob_placeholder: keep}
+                         self._network.keep_prob_placeholder: args[0]}
         elif self._network.reg == 'l2':
             feed_dict = {self._network.data_placeholder: xs,
                          self._network.target_placeholder: ys,
-                         self._network.l2_placeholder: l2}
+                         self._network.l2_placeholder: args[0]}
         else:
             feed_dict = {self._network.data_placeholder: xs,
                          self._network.target_placeholder: ys}

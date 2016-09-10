@@ -25,10 +25,10 @@ class OutputLayer(Layer):
         self.n_neurons = None
 
     def construct(self, layers_configs, layers_results):
-        net_type = layers_configs[0]['para']['ntype']
+        net_type = layers_configs['para'][0]['ntype']
         if (net_type == 'CNet') and (self.activator is not None):
             raise AttributeError('The activator in output layer for classification neural network has to be None')
-        self.n_neurons = layers_configs[0]['net_in_out']['output_size']
+        self.n_neurons = layers_configs['net_in_out'][0]['output_size']
         self._construct(self.n_neurons, layers_configs, layers_results)
 
 
@@ -42,16 +42,16 @@ class FCLayer(Layer):
         self.n_neurons = n_neurons
 
     def construct(self, layers_configs, layers_results):
-        if layers_configs[-1]['type'] == 'conv':
-            conv_shape = layers_configs[-1]['neural_structure']['output_size']
+        if layers_configs['type'][-1] == 'conv':
+            conv_shape = layers_configs['neural_structure'][-1]['output_size']
             flat_shape = conv_shape[0] * conv_shape[1] * conv_shape[2]
-            layers_configs[-1]['neural_structure']['output_size'] = flat_shape
+            layers_configs['neural_structure'][-1]['output_size'] = flat_shape
 
             flat_result = tfnn.reshape(
-                layers_results[-1]['final'],
+                layers_results['final'][-1],
                 [-1, flat_shape], name='flat4fc')
-            layers_results[-1]['final'] = flat_result
-        elif layers_configs[-1]['type'] == 'fc':
+            layers_results['final'][-1] = flat_result
+        elif layers_configs['type'][-1] == 'fc':
             pass
         else:
             raise TypeError('The first Fully connected layer should followed by a Convolutional layer')

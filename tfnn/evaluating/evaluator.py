@@ -1,7 +1,7 @@
 import tfnn
 import matplotlib.pyplot as plt
 import numpy as np
-from tfnn.evaluating.score_monitor import ScoreMonitor
+from tfnn.evaluating.scale_monitor import ScaleMonitor
 from tfnn.evaluating.layer_monitor import LayerMonitor
 from tfnn.evaluating.data_fitting_monitor import DataFittingMonitor
 from tfnn.evaluating.line_fitting_monitor import LineFittingMonitor
@@ -18,6 +18,7 @@ class Evaluator(object):
                                                 tfnn.argmax(network.target_placeholder, 1), name='correct_prediction')
                 self.accuracy = tfnn.reduce_mean(tfnn.cast(correct_prediction, tfnn.float32), name='accuracy')
                 tfnn.scalar_summary('accuracy', self.accuracy)
+
         if isinstance(self.network, tfnn.RegNetwork):
             with tfnn.name_scope('r2_score'):
                 self.ys_mean = ys_mean = tfnn.reduce_mean(network.target_placeholder, reduction_indices=[0], name='ys_mean')
@@ -96,7 +97,7 @@ class Evaluator(object):
         feed_dict = self.get_feed_dict(xs, ys)
         return self.f1.eval(feed_dict, self.network.sess)
 
-    def set_score_monitor(self, objects, figsize=(10, 10), sleep=0.001):
+    def set_scale_monitor(self, objects, figsize=(10, 10), sleep=0.001):
         """
         :param objects: a list. A list like ['cost', 'r2'];
         :param grid_space: a tuple or list of (max_rows, max_cols);
@@ -113,8 +114,8 @@ class Evaluator(object):
         if isinstance(self.network, tfnn.RegNetwork):
             if ('accuracy' in objects) or ('f1' in objects):
                 raise ValueError('accuracy or f1 score are not used for regression networks')
-        self.score_monitor = ScoreMonitor(grid_space, objects, self, figsize, sleep)
-        return self.score_monitor
+        self.scale_monitor = ScaleMonitor(grid_space, objects, self, figsize, sleep)
+        return self.scale_monitor
 
     def set_layer_monitor(self, objects, figsize=(13, 10), cbar_range=(-1, 1), cmap='rainbow',
                           sleep=0.001):
@@ -129,7 +130,7 @@ class Evaluator(object):
 
     def set_data_fitting_monitor(self, figsize=(8, 7), sleep=0.001):
         """
-        Suitable for analysing the datasets with only one output unit.
+        Suitable for analysing the preprocessing with only one output unit.
         :param v_xs: validated xs
         :param v_ys: validated ys (single attribute)
         :param continue_plot: True or False
@@ -147,9 +148,9 @@ class Evaluator(object):
         return self.line_fitting_monitor
 
     def monitoring(self, t_xs, t_ys, **kwargs):
-        if hasattr(self, 'score_monitor'):
-            v_xs, v_ys, global_step = kwargs['v_xs'], kwargs['v_ys'], kwargs['global_step']
-            self.score_monitor.monitoring(t_xs, t_ys, global_step, v_xs, v_ys)
+        if hasattr(self, 'scale_monitor'):
+            v_xs, v_ys = kwargs['v_xs'], kwargs['v_ys']
+            self.scale_monitor.monitoring(t_xs, t_ys, v_xs, v_ys)
         if hasattr(self, 'layer_monitor'):
             self.layer_monitor.monitoring(t_xs, t_ys)
         if hasattr(self, 'data_fitting_monitor'):
@@ -157,21 +158,6 @@ class Evaluator(object):
             self.data_fitting_monitor.monitoring(v_xs, v_ys)
         if hasattr(self, 'line_fitting_monitor'):
             self.line_fitting_monitor.monitoring(t_xs, t_ys)
-
-
-    def plot_regression_nonlinear_comparison(self, xs, ys, continue_plot=False):
-        """
-        Suitable for analysing the dataset with only one attribute and single output.
-        :param v_xs: Only has one attribute
-        :param v_ys: Only has one attribute
-        :param continue_plot: True or False
-        :return: plotting
-        """
-        if not isinstance(self.network, tfnn.RegNetwork):
-            raise NotImplementedError('Can only plot this result for Regression neural network.')
-        elif ys.shape[1] > 1:
-            raise NotImplementedError('Can only support ys which have single value.')
-
 
     def get_feed_dict(self, xs, ys):
         if self.network.reg == 'dropout':

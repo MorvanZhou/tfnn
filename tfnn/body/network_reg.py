@@ -12,7 +12,7 @@ class RegNetwork(Network):
 
     def _init_loss(self):
         with tfnn.name_scope('predictions'):
-            self.predictions = self.layers_results[-1]['final']
+            self.predictions = self.layers_results['final'][-1]
         with tfnn.name_scope('loss'):
             loss_square = tfnn.square(self.target_placeholder - self.predictions,
                                       name='loss_square')
@@ -22,7 +22,7 @@ class RegNetwork(Network):
             if self.reg == 'l2':
                 with tfnn.name_scope('l2_reg'):
                     regularizers = 0
-                    for layer in self.layers:
+                    for layer in self.layers_results['Layer'][1:]:
                         regularizers += tfnn.nn.l2_loss(layer.W, name='l2_reg')
                     regularizers *= self.l2_placeholder
                 with tfnn.name_scope('l2_loss'):
