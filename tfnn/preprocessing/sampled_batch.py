@@ -12,7 +12,6 @@ def sampled_batch(data, batch_size, replace=False, p=None):
                 If not given the sample assumes a uniform distribution over all entries in a.
     :return:
     """
-    batch_data = data.copy()
-    batch_data.data = data.data[np.random.choice(data.data.shape[0], batch_size, replace=replace, p=p), :]
+    _sampled_batch = data.data[np.random.choice(data.data.shape[0], batch_size, replace=replace, p=p), :]
 
-    return batch_data
+    return [_sampled_batch[:, :data.n_xfeatures], _sampled_batch[:, data.n_xfeatures:]]

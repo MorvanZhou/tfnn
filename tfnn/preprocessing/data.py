@@ -37,14 +37,6 @@ class Data:
         self.name = name
 
     @property
-    def _xshape(self):
-        return self.xs.shape
-
-    @property
-    def _yshape(self):
-        return self.ys.shape
-
-    @property
     def xs(self):
         return self.data[:, :self.n_xfeatures]
 
@@ -65,7 +57,7 @@ class Data:
         :param inplace: True of False
         :return:
         """
-        _ys = datasets_onehot_encode(data.ys, inplace)
+        _ys = datasets_onehot_encode(self.ys, inplace)
         data_copy = self.data.copy()
         data_copy = np.delete(data_copy, self.n_xfeatures, axis=1)
         data_copy = np.insert(data_copy, [self.n_xfeatures], _ys, axis=1)

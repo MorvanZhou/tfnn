@@ -13,7 +13,7 @@ data.shuffle(inplace=True)
 network = tfnn.RegNetwork(input_size=data.xs.shape[1], output_size=data.ys.shape[1])
 
 # normalize features
-norm_data = network.normalizer.minmax_fit(data)
+norm_data = network.normalizer.minmax(data)
 
 # train test split
 t_data, v_data = norm_data.train_test_split(0.7)

@@ -100,7 +100,7 @@ class LayerMonitor(Monitor):
                 # self._fig.canvas.blit(self._axes[W_name].bbox)
                 # self._fig.canvas.blit(self._axes[res_name].bbox)
             res_y_label = len(all_outputs[name])
-            self._axes[res_name].set_ylabel(r'$batch\ size:%i$' % res_y_label)
+            self._axes[res_name].set_ylabel(r'$Batch\ size:\ %i$' % res_y_label)
         # self._fig.canvas.draw()
         self._fig.canvas.flush_events()
         self._1st_images = False

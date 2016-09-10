@@ -11,72 +11,9 @@ plt.style.use('ggplot')
 class Evaluator(object):
     def __init__(self, network, ):
         self.network = network
-
-        if isinstance(self.network, tfnn.ClfNetwork):
-            with tfnn.name_scope('accuracy'):
-                correct_prediction = tfnn.equal(tfnn.argmax(network.predictions, 1),
-                                                tfnn.argmax(network.target_placeholder, 1), name='correct_prediction')
-                self.accuracy = tfnn.reduce_mean(tfnn.cast(correct_prediction, tfnn.float32), name='accuracy')
-                tfnn.scalar_summary('accuracy', self.accuracy)
-
-        if isinstance(self.network, tfnn.RegNetwork):
-            with tfnn.name_scope('r2_score'):
-                self.ys_mean = ys_mean = tfnn.reduce_mean(network.target_placeholder, reduction_indices=[0], name='ys_mean')
-                self.ss_tot = ss_tot = tfnn.reduce_sum(tfnn.square(network.target_placeholder - ys_mean),
-                                         reduction_indices=[0], name='total_sum_squares')
-                # ss_reg = np.sum(np.square(predictions-ys_mean), axis=0)
-                self.ss_res = ss_res = tfnn.reduce_sum(tfnn.square(network.target_placeholder - network.predictions),
-                                         reduction_indices=[0], name='residual_sum_squares')
-                self.aaa = ss_res/ss_tot
-                self.r2 = tfnn.reduce_mean(
-                    tfnn.sub(tfnn.ones_like(ss_res, dtype=tfnn.float32), (ss_res / ss_tot)),
-                    name='coefficient_of_determination')
-                tfnn.scalar_summary('r2_score', self.r2)
-
-        if isinstance(self.network, tfnn.ClfNetwork):
-            # TODO: Fix f1 score
-            with tfnn.name_scope('f1_score'):
-                predictions = tfnn.argmax(network.predictions, 1)
-                actuals = tfnn.argmax(network.target_placeholder, 1)
-
-                ones_like_actuals = tfnn.ones_like(actuals)
-                zeros_like_actuals = tfnn.zeros_like(actuals)
-                ones_like_predictions = tfnn.ones_like(predictions)
-                zeros_like_predictions = tfnn.zeros_like(predictions)
-
-                tp = tfnn.reduce_sum(
-                    tfnn.cast(
-                        tfnn.logical_and(
-                            tfnn.equal(actuals, ones_like_actuals),
-                            tfnn.equal(predictions, ones_like_predictions)
-                        ), "float"))
-
-                tn = tfnn.reduce_sum(
-                    tfnn.cast(
-                        tfnn.logical_and(
-                            tfnn.equal(actuals, zeros_like_actuals),
-                            tfnn.equal(predictions, zeros_like_predictions)
-                        ), "float"))
-
-                fp = tfnn.reduce_sum(
-                    tfnn.cast(
-                        tfnn.logical_and(
-                            tfnn.equal(actuals, zeros_like_actuals),
-                            tfnn.equal(predictions, ones_like_predictions)
-                        ), "float"))
-
-                fn = tfnn.reduce_sum(
-                    tfnn.cast(
-                        tfnn.logical_and(
-                            tfnn.equal(actuals, ones_like_actuals),
-                            tfnn.equal(predictions, zeros_like_predictions)
-                        ), "float"))
-
-                recall = tp / (tp + fn)
-                precision = tp / (tp + fp)
-
-                self.f1 = tfnn.div(2 * (precision * recall), (precision + recall), name='f1_score')
-                tfnn.scalar_summary('f1_score', self.f1)
+        self._set_accuracy()
+        self._set_r2()
+        self._set_confusion_metrics()
 
     def compute_r2(self, xs, ys):
         feed_dict = self.get_feed_dict(xs, ys)
@@ -177,3 +114,85 @@ class Evaluator(object):
     def hold_plot():
         plt.ioff()
         plt.show()
+
+    def _set_accuracy(self):
+        if isinstance(self.network, tfnn.ClfNetwork):
+            with tfnn.name_scope('accuracy'):
+                correct_prediction = tfnn.equal(
+                    tfnn.argmax(self.network.predictions, 1),
+                    tfnn.argmax(self.network.target_placeholder, 1),
+                    name='correct_prediction')
+                self.accuracy = tfnn.reduce_mean(
+                    tfnn.cast(correct_prediction, tfnn.float32), name='accuracy')
+                tfnn.scalar_summary('accuracy', self.accuracy)
+
+    def _set_r2(self):
+        if isinstance(self.network, tfnn.RegNetwork):
+            with tfnn.name_scope('r2_score'):
+                self.ys_mean = ys_mean = tfnn.reduce_mean(self.network.target_placeholder,
+                                                          reduction_indices=[0],
+                                                          name='ys_mean')
+                self.ss_tot = ss_tot = tfnn.reduce_sum(
+                    tfnn.square(self.network.target_placeholder - ys_mean),
+                    reduction_indices=[0], name='total_sum_squares')
+                # ss_reg = np.sum(np.square(predictions-ys_mean), axis=0)
+                self.ss_res = ss_res = tfnn.reduce_sum(
+                    tfnn.square(self.network.target_placeholder - self.network.predictions),
+                    reduction_indices=[0], name='residual_sum_squares')
+                self.aaa = ss_res / ss_tot
+                self.r2 = tfnn.reduce_mean(
+                    tfnn.sub(tfnn.ones_like(ss_res, dtype=tfnn.float32), (ss_res / ss_tot)),
+                    name='coefficient_of_determination')
+                tfnn.scalar_summary('r2_score', self.r2)
+
+    def _set_confusion_metrics(self):
+        # from https://cloud.google.com/solutions/machine-learning-with-financial-time-series-data
+        if not isinstance(self.network, tfnn.ClfNetwork):
+            raise TypeError('confusion metrics is for classification problem')
+        else:
+            # for onehot data
+            with tfnn.name_scope('f1_score'):
+                predictions = tfnn.argmax(self.network.predictions, 1)
+                actuals = tfnn.argmax(self.network.target_placeholder, 1)
+
+                ones_like_actuals = tfnn.ones_like(actuals)
+                zeros_like_actuals = tfnn.zeros_like(actuals)
+                ones_like_predictions = tfnn.ones_like(predictions)
+                zeros_like_predictions = tfnn.zeros_like(predictions)
+
+                tp = tfnn.reduce_sum(
+                    tfnn.cast(
+                        tfnn.logical_and(
+                            tfnn.equal(actuals, ones_like_actuals),
+                            tfnn.equal(predictions, ones_like_predictions)
+                        ), "float"))
+
+                tn = tfnn.reduce_sum(
+                    tfnn.cast(
+                        tfnn.logical_and(
+                            tfnn.equal(actuals, zeros_like_actuals),
+                            tfnn.equal(predictions, zeros_like_predictions)
+                        ), "float"))
+
+                fp = tfnn.reduce_sum(
+                    tfnn.cast(
+                        tfnn.logical_and(
+                            tfnn.equal(actuals, zeros_like_actuals),
+                            tfnn.equal(predictions, ones_like_predictions)
+                        ), "float"))
+
+                fn = tfnn.reduce_sum(
+                    tfnn.cast(
+                        tfnn.logical_and(
+                            tfnn.equal(actuals, ones_like_actuals),
+                            tfnn.equal(predictions, zeros_like_predictions)
+                        ), "float"))
+
+                self.recall = tp / (tp + fn)
+                self.precision = tp / (tp + fp)
+
+                self.f1 = tfnn.div(2 * (self.precision * self.recall),
+                                   (self.precision + self.recall), name='f1_score')
+                tfnn.scalar_summary('f1_score', self.f1)
+                tfnn.scalar_summary('precision', self.precision)
+                tfnn.scalar_summary('recall', self.recall)

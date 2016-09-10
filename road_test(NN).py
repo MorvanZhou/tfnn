@@ -28,7 +28,7 @@ def train(data_path, duration, save_to='/tmp/'):
     data = tfnn.Data(xs, ys, name='road_data')
 
     network = tfnn.RegNetwork(xs.shape[1], 1, do_dropout=False)
-    n_data = network.normalizer.minmax_fit(data)
+    n_data = network.normalizer.minmax(data)
     t_data, v_data = n_data.train_test_split(0.8)
     # the number of hidden unit is 2 * xs features
     network.add_hidden_layer(100, activator=tfnn.nn.relu, dropout_layer=False)
@@ -396,7 +396,7 @@ def cross_validation(path):
         data = tfnn.Data(xs, ys, name='road_data')
 
         network = tfnn.RegNetwork(xs.shape[1], 1, do_dropout=False)
-        n_data = network.normalizer.minmax_fit(data)
+        n_data = network.normalizer.minmax(data)
         t_data, v_data = n_data.train_test_split(0.7)
 
         # the number of hidden unit is 2 * xs features

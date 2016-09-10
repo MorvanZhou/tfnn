@@ -28,10 +28,10 @@ class LineFittingMonitor(Monitor):
             sorted_predicted_data = predicted_data[np.argsort(predicted_data[:, 0])]
             self._ax.scatter(xs, ys,
                              c=self.color_train,   # red like
-                             s=20, alpha=0.9, label=r'$real\ data$')
+                             s=20, alpha=0.9, label=r'$Real\ data$')
             self._line, = self._ax.plot(sorted_predicted_data[:, 0], sorted_predicted_data[:, 1],
                                         c=self.color_test,   # blue like
-                                        lw=3, alpha=0.5, label=r'$prediction$')
+                                        lw=3, alpha=0.5, label=r'$Prediction$')
             self._ax.set_xlabel(r'$Input$')
             self._ax.set_ylabel(r'$Output$')
             self._ax.legend(loc='best')

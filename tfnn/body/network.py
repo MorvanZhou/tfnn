@@ -203,8 +203,8 @@ class Network(object):
             feed_xs = feed_xs[np.newaxis, :]
         if np.ndim(feed_ys) == 1:
             feed_ys = feed_ys[np.newaxis, :]
-        _feed_dict = self._get_feed_dict(feed_xs, feed_ys, *args, **kwargs)
         self._check_init()
+        _feed_dict = self._get_feed_dict(feed_xs, feed_ys, *args, **kwargs)
         self.sess.run(self._train_op, feed_dict=_feed_dict)
 
     def fit(self, feed_xs, feed_ys, steps=2000, *args, **kwargs):
@@ -299,23 +299,29 @@ class Network(object):
                 kp = args[0]
             else:
                 kp = kwargs['keep_prob']
+
+            if not hasattr(self, 'keep_prob'):
+                self.keep_prob = tfnn.constant(kp)
+
             _feed_dict = {
                 self.data_placeholder: xs,
                 self.target_placeholder: ys,
                 self.keep_prob_placeholder: kp
             }
-            self.keep_prob = tfnn.constant(kp)
         elif self.reg == 'l2':
             if args:
                 l2_value = args[0]
             else:
                 l2_value = kwargs['l2_value']
+
+            if not hasattr(self, 'l2_value'):
+                self.l2_value = tfnn.constant(l2_value)
+
             _feed_dict = {
                 self.data_placeholder: xs,
                 self.target_placeholder: ys,
                 self.l2_placeholder: l2_value
             }
-            self.l2_value = tfnn.constant(l2_value)
         else:
             _feed_dict = {
                 self.data_placeholder: xs,

@@ -17,7 +17,7 @@ class ScaleMonitor(Monitor):
             self._axes[name] = plt.subplot2grid(grid_space, (r_loc, 0), colspan=c_span, rowspan=r_span)
             if name != objects[-1]:
                 plt.setp(self._axes[name].get_xticklabels(), visible=False)
-            self._axes[name].set_ylabel(r'$%s$' % name.replace(' ', r'\ '))
+            self._axes[name].set_ylabel(r'$%s$' % name.replace(' ', r'\ ').capitalize())
         self._fig.subplots_adjust(hspace=0.1)
         plt.ion()
         plt.show()
@@ -48,10 +48,18 @@ class ScaleMonitor(Monitor):
             elif object_name == 'f1':
                 object_names.append(object_name)
                 object_ops.append(self.evaluator.f1)
+            elif object_name == 'precision':
+                object_names.append(object_name)
+                object_ops.append(self.evaluator.precision)
+            elif object_name == 'recall':
+                object_names.append(object_name)
+                object_ops.append(self.evaluator.recall)
             elif object_name == 'learning rate':
                 object_names.append(object_name)
                 object_ops.append(self._network.lr)
             elif object_name == 'dropout':
+                if not hasattr(self._network, 'keep_prob'):
+                    raise AttributeError('The dropout has not been set.')
                 object_names.append(object_name)
                 object_ops.append(self._network.keep_prob)
             else:
@@ -80,13 +88,13 @@ class ScaleMonitor(Monitor):
             self._tplot_axes[_name], = self._axes[_name].plot([1, 1], [1, 1],
                                                               c=self.color_train,  # red like
                                                               ls='-',
-                                                              lw=2, label='train')
+                                                              lw=2, label=r'$Train$')
             if v_results is not None:
                 if _name not in ['learning rate', 'dropout']:
                     self._vplot_axes[_name], = self._axes[_name].plot([2, 2], [2, 2],
                                                                       c=self.color_test,  # blue like
                                                                       ls='--',
-                                                                      lw=2, label='test')
+                                                                      lw=2, label=r'$Test$')
         for _name in object_names:
             if _name in ['r2', 'accuracy', 'f1']:
                 self._axes[_name].legend(loc='lower right')
