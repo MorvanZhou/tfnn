@@ -28,6 +28,8 @@ class Summarizer(object):
             value_pass_in = self._network.sess.run(self._network.keep_prob)
         elif self._network.reg == 'l2':
             value_pass_in = self._network.sess.run(self._network.l2_value)
+        else:
+            value_pass_in = None
         global_step = self._network.sess.run(self._network.global_step)
         feed_dict = self._get_feed_dict(t_xs, t_ys, value_pass_in)
         train_result = self._network.sess.run(self.merged, feed_dict)
@@ -40,6 +42,8 @@ class Summarizer(object):
             value_pass_in = 1.
         elif self._network.reg == 'l2':
             value_pass_in = 0.
+        else:
+            value_pass_in = None
         global_step = self._network.sess.run(self._network.global_step)
         feed_dict = self._get_feed_dict(v_xs, v_ys, value_pass_in)
         test_result = self._network.sess.run(self.merged, feed_dict)

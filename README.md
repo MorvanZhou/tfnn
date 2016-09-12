@@ -5,8 +5,7 @@ This is a high level module based on tensorflow
 Requirements.
 1. tensorflow
 2. numpy
-3. pandas
-4. matplotlib
+3. matplotlib
 
 Easy to construct neural network and evaluate performance.
 
