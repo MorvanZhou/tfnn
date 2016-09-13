@@ -40,7 +40,7 @@ evaluator.set_layer_monitor([0, 1, ], figsize=(8, 7), sleep=0.05)  # [0, 1] repr
 
 # train network
 for step in range(1000):
-    b_xs, b_ys = t_data.next_batch(10, loop=True)
+    b_xs, b_ys = t_data.next_batch(10,)
     network.run_step(b_xs, b_ys)
     if step % 10 == 0:
         evaluator.monitoring(b_xs, b_ys)

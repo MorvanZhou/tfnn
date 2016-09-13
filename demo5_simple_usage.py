@@ -42,7 +42,7 @@ evaluator.set_scale_monitor(['r2', 'cost'])
 
 # train network
 for step in range(400):
-    b_xs, b_ys = t_data.next_batch(20, loop=True)
+    b_xs, b_ys = t_data.next_batch(20,)
     network.run_step(b_xs, b_ys)
     if step % 10 == 0:
         evaluator.monitoring(b_xs, b_ys, v_xs=v_data.xs, v_ys=v_data.ys)

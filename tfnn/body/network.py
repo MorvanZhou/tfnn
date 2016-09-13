@@ -29,30 +29,28 @@ class Network(object):
             if do_dropout:
                 self.keep_prob_placeholder = tfnn.placeholder(dtype=tfnn.float32)
                 tfnn.scalar_summary('dropout_keep_probability', self.keep_prob_placeholder)
-                _para = {'reg': self.reg, 'keep_prob': self.keep_prob_placeholder}
+                _reg_value = self.keep_prob_placeholder
             elif do_l2:
                 self.l2_placeholder = tfnn.placeholder(tfnn.float32)
                 tfnn.scalar_summary('l2_value', self.l2_placeholder)
-                _para = {'reg': self.reg, 'l2_value': self.l2_placeholder}
+                _reg_value = self.l2_placeholder
             else:
-                _para = {'reg': self.reg}
-        _para['ntype'] = ntype
-        _input_layer_configs = {
+                _reg_value = None
+
+        self.layers_configs = {
             'type': ['input'],
             'name': ['input_layer'],
             'neural_structure': [{'input_size': self.input_size, 'output_size': self.input_size}],
-            'para': [_para],
-            'net_in_out': [{'input_size': self.input_size, 'output_size': self.output_size}]
+            'ntype': ntype,
         }
-        _input_layer_results = {
+        self.layers_results = {
+            'reg_value': _reg_value,
             'Layer': [None],
             'Wx_plus_b': [None],
             'activated': [None],
             'dropped': [None],
             'final': [self.data_placeholder]
         }
-        self.layers_configs = _input_layer_configs
-        self.layers_results = _input_layer_results
 
     def build_layers(self, layers):
         if isinstance(layers, Layer):
@@ -210,7 +208,7 @@ class Network(object):
     def fit(self, feed_xs, feed_ys, steps=2000, *args, **kwargs):
         train_data = tfnn.Data(feed_xs, feed_ys)
         for _ in range(steps):
-            b_xs, b_ys = train_data.next_batch(100, loop=True)
+            b_xs, b_ys = train_data.next_batch(100)
             self.run_step(feed_xs=b_xs, feed_ys=b_ys, *args, **kwargs)
 
     def get_loss(self, xs, ys):
@@ -284,9 +282,9 @@ class Network(object):
         self.sess.close()
 
     def _add_to_log(self, layer):
-        for key in self.layers_configs.keys():
+        for key in layer.configs_dict.keys():
             self.layers_configs[key].append(layer.configs_dict[key])
-        for key in self.layers_results.keys():
+        for key in layer.results_dict.keys():
             self.layers_results[key].append(layer.results_dict[key])
 
     def _init_loss(self):
@@ -328,5 +326,13 @@ class Network(object):
                 self.target_placeholder: ys
             }
         return _feed_dict
+
+    def __add__(self, _layers):
+        self.build_layers(_layers)
+        return self
+
+    def __iadd__(self, _layers):
+        self.build_layers(_layers)
+        return self
 
 

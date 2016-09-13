@@ -44,6 +44,7 @@ class ConvLayer(Layer):
                  dropout_layer=False, w_initial='xavier', name=None,):
         super(ConvLayer, self).__init__(activator, dropout_layer, w_initial,
                                         name, layer_type='conv')
+        self._check_activator(activator)
         self.patch_x = patch_x
         self.patch_y = patch_y
         self.n_filters = n_filters
@@ -60,6 +61,15 @@ class ConvLayer(Layer):
                 ksize=self.pool_k,
                 padding=self.pool_padding,
                 )
+
+        self._para = {
+                'patch_x': self.patch_x, 'patch_y': self.patch_y, 'n_filters': self.n_filters,
+                'activator': self.activator_name, 'strides': self.strides,
+                'padding': self.padding, 'pooling': self.pooling,
+                'pool_strides': self.pool_strides, 'pool_k': self.pool_k,
+                'pool_padding': self.pool_padding, 'dropout_layer': self.dropout_layer,
+                'image_shape': self.image_shape, 'w_initial': self.w_initial, 'name': self.name,
+                 }
 
     def construct(self, layers_configs, layers_results):
         self._check_image_shape(layers_configs, layers_results)
@@ -110,12 +120,10 @@ class ConvLayer(Layer):
                     padding=self.padding) \
                     + self.b
 
-            if self.activator is not None:
-                if isinstance(self.activator, str):
-                    self.activator = self._get_activator(self.activator)
-                activated_product = self.activator(product)
-            else:
+            if self.activator is None:
                 activated_product = product
+            else:
+                activated_product = self.activator(product)
             tfnn.histogram_summary(self.name + '/activated_product', activated_product)
 
         # pooling process
@@ -124,9 +132,9 @@ class ConvLayer(Layer):
                 image=activated_product, layer_size=_in_size, n_filters=self.n_filters)
             tfnn.histogram_summary(self.name + '/pooled_product', pooled_product)
 
-        _reg = layers_configs['para'][0]['reg']
-        if (_reg == 'dropout') and self.dropout_layer:
-            _keep_prob = layers_configs['para'][0]['keep_prob']
+        _do_dropout = layers_configs['para'][0]['do_dropout']
+        if _do_dropout and self.dropout_layer:
+            _keep_prob = layers_results['reg_value']
             dropped_product = tfnn.nn.dropout(
                 pooled_product,
                 _keep_prob,
@@ -136,20 +144,11 @@ class ConvLayer(Layer):
             dropped_product = None
             final_product = pooled_product
 
-        activator_name = activated_product.name.split('/')[-1].split(':')[0] \
-            if 'Wx_add_b' not in activated_product.name else None
-
         self.configs_dict = {
             'type': 'conv',
             'name': self.name,
             'neural_structure': {'input_size': _in_size, 'output_size': _out_size},
-            'para': {'patch_x': self.patch_x, 'patch_y': self.patch_y, 'n_filters': self.n_filters,
-                     'activator': activator_name, 'strides': self.strides,
-                     'padding': self.padding, 'pooling': self.pooling,
-                     'pool_strides': self.pool_strides, 'pool_k': self.pool_k,
-                     'pool_padding': self.pool_padding, 'dropout_layer': self.dropout_layer,
-                     'image_shape': self.image_shape, 'w_initial': self.w_initial, 'name': self.name, },
-            'net_in_out': None,
+            'para': self._para,
         }
         self.results_dict = {
             'Layer': self,

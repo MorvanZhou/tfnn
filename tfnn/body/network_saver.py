@@ -122,45 +122,15 @@ class NetworkSaver(object):
             if index == 0:
                 continue
             para = layers_configs['para'][index]
-            layer_activator = para['activator']
             layer_type = layers_configs['type'][index]
-
-            if layer_activator is None:
-                activator = None
-            elif layer_activator == 'Relu6':
-                activator = tfnn.nn.relu6
-            elif layer_activator == 'Relu':
-                activator = tfnn.nn.relu
-            elif layer_activator == 'Softplus':
-                activator = tfnn.nn.softplus
-            elif layer_activator == 'Sigmoid':
-                activator = tfnn.sigmoid
-            elif layer_activator == 'Tanh':
-                activator = tfnn.tanh
-            else:
-                raise ValueError('No activator as %s.' % layer_activator)
             if layer_type == 'hidden':
-                network.add_hidden_layer(
-                    n_neurons=para['n_neurons'], activator=activator,
-                    dropout_layer=para['dropout_layer'], w_initial=para['w_initial'],
-                    name=para['name'])
+                network.add_hidden_layer(**para)
             elif layer_type == 'fc':
-                network.add_fc_layer(
-                    n_neurons=para['n_neurons'], activator=activator,
-                    dropout_layer=para['dropout_layer'], w_initial=para['w_initial'],
-                    name=para['name'])
+                network.add_fc_layer(**para)
             elif layer_type == 'output':
-                network.add_output_layer(
-                    activator=activator, dropout_layer=para['dropout_layer'],
-                    w_initial=para['w_initial'], name=para['name'])
+                network.add_output_layer(**para)
             elif layer_type == 'conv':
-                network.add_conv_layer(
-                    patch_x=para['patch_x'], patch_y=para['patch_y'], n_filters=para['n_filters'],
-                    activator=activator, strides=para['strides'], padding=para['padding'],
-                    pooling=para['pooling'], pool_strides=para['pool_strides'],
-                    pool_k=para['pool_k'], pool_padding=para['pool_padding'],
-                    dropout_layer=para['dropout_layer'], image_shape=para['image_shape'],
-                    w_initial=para['w_initial'], name=para['name'], )
+                network.add_conv_layer(**para)
         network.sess = tfnn.Session()
         self._network = network
         _saver = tfnn.train.Saver()

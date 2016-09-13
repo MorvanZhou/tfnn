@@ -5,11 +5,20 @@ import numpy as np
 class Layer(object):
     def __init__(self, activator, dropout_layer, w_initial, name,
                  layer_type,):
-        self.activator = activator
+        self._check_activator(activator)
         self.dropout_layer = dropout_layer
         self.w_initial = w_initial
         self.name = name
         self.layer_type = layer_type
+        self._para = {
+                 'activator': self.activator_name,
+                 'dropout_layer': self.dropout_layer,
+                 'name': self.name,
+                 'w_initial': self.w_initial
+             }
+
+    def __str__(self):
+        return self.name
 
     def construct(self, *args, **kwargs):
         raise NotImplementedError("Abstract method")
@@ -55,14 +64,12 @@ class Layer(object):
             if self.activator is None:
                 activated_product = product
             else:
-                if isinstance(self.activator, str):
-                    self.activator = self._get_activator(self.activator)
                 activated_product = self.activator(product)
             tfnn.histogram_summary(self.name + '/activated_product', activated_product)
 
-            _reg = layers_configs['para'][0]['reg']
-            if (_reg == 'dropout') and self.dropout_layer:
-                _keep_prob = layers_configs['para'][0]['keep_prob']
+            _do_dropout = layers_configs['para'][0]['do_dropout']
+            if _do_dropout and self.dropout_layer:
+                _keep_prob = layers_results['reg_value']
                 dropped_product = tfnn.nn.dropout(activated_product,
                                                   _keep_prob,
                                                   name='dropout')
@@ -71,23 +78,19 @@ class Layer(object):
                 dropped_product = None
                 final_product = activated_product
 
-        activator_name = activated_product.name.split('/')[-1].split(':')[0] \
-            if 'Wx_add_b' not in activated_product.name else None
-
-        self.configs_dict = \
-            {'type': self.layer_type,
-             'name': self.name,
-             'neural_structure': {'input_size': _input_size, 'output_size': n_neurons},
-             'para': {'n_neurons': n_neurons, 'activator': activator_name,
-                      'dropout_layer': self.dropout_layer, 'name': self.name, 'w_initial': self.w_initial},
-             'net_in_out': None,
-             }
-        self.results_dict = \
-            {'Layer': self,
-             'Wx_plus_b': product,
-             'activated': activated_product,
-             'dropped': dropped_product,
-             'final': final_product}
+        self.configs_dict = {
+            'type': self.layer_type,
+            'name': self.name,
+            'neural_structure': {'input_size': _input_size, 'output_size': n_neurons},
+            'para': self._para,
+        }
+        self.results_dict = {
+            'Layer': self,
+            'Wx_plus_b': product,
+            'activated': activated_product,
+            'dropped': dropped_product,
+            'final': final_product
+        }
 
     def _check_name(self, layers_configs):
         if self.name is None:
@@ -142,6 +145,7 @@ class Layer(object):
 
     @staticmethod
     def _get_activator(name):
+        name = name.lower()
         if name == 'relu':
             activator = tfnn.nn.relu
         elif name == 'relu6':
@@ -163,3 +167,14 @@ class Layer(object):
                 '''the activation function %s is not supported. Function available:
                 [relu, relu6, elu, tanh, sigmoid, softplus, softsign, softmax]''' % name)
         return activator
+
+    def _check_activator(self, activator):
+        if isinstance(activator, str):
+            self.activator_name = activator
+            self.activator = self._get_activator(self.activator_name)
+        elif isinstance(activator, type(None)):
+            self.activator_name = activator
+            self.activator = activator
+        else:
+            self.activator_name = activator(0).op.type.lower()
+            self.activator = activator

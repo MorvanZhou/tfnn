@@ -27,7 +27,7 @@ network.set_optimizer(optimizer='adam')
 evaluator = tfnn.Evaluator(network)
 
 for i in range(2000):
-    b_xs, b_ys = t_data.next_batch(50, loop=True)
+    b_xs, b_ys = t_data.next_batch(50)
     network.run_step(b_xs, b_ys)
     if i % 50 == 0:
         print('Cost = ', round(evaluator.compute_cost(v_data.xs, v_data.ys), 3))

@@ -30,10 +30,10 @@ network = tfnn.ClfNetwork(data.xs.shape[1], data.ys.shape[1], )
 norm_data = network.normalizer.minmax(data)
 t_data, v_data = norm_data.train_test_split(0.7)
 
-h1 = tfnn.HiddenLayer(10, activator='relu', dropout_layer=True)
+h1 = tfnn.HiddenLayer(10, activator=tfnn.nn.relu, dropout_layer=True)
 h2 = tfnn.HiddenLayer(10, activator='tanh', dropout_layer=False)
 out = tfnn.OutputLayer(activator=None, w_initial='random_normal')
-network.build_layers([h1, h2, out])
+network + [h1, h2, out]
 
 network.set_optimizer('GD')
 network.set_learning_rate(lr=0.01, exp_decay=dict(decay_steps=1000, decay_rate=0.9, staircase=False))

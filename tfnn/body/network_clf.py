@@ -12,6 +12,17 @@ class ClfNetwork(Network):
             input_size, output_size, do_dropout, do_l2, ntype='CNet')
         self.method = method
         self.name = 'ClassificationNetwork'
+        self._para = {
+            'input_size': input_size,
+            'output_size': output_size,
+            'method': method,
+            'do_dropout': do_dropout,
+            'do_l2': do_l2,
+        }
+        self.layers_configs['para'] = [self._para]
+
+    def __str__(self):
+        return self.name
 
     def _init_loss(self):
         with tfnn.name_scope('predictions'):

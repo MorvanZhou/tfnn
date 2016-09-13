@@ -19,14 +19,9 @@ n_classes = 10      # MNIST classes (0-9 digits)
 
 # tf Graph input
 x = tf.placeholder(tf.float32, [None, n_steps, n_inputs])
-def length(data):
-    used = tf.sign(tf.reduce_max(tf.abs(data), reduction_indices=2))
-    length = tf.reduce_sum(used, reduction_indices=1)
-    length = tf.cast(length, tf.int32)
-    return length
-
 # for LSTM the init_state include units for gates and units for hidden. so 2*hidden_units as default
 init_state = tf.placeholder(tf.float32, [None, 2*n_hidden_unis])
+init_state = tf.split(split_dim=1, num_split=2, value=init_state)
 y = tf.placeholder(tf.float32, [None, n_classes])
 
 # Define weights
@@ -44,7 +39,7 @@ biases = {
 }
 
 
-def RNN(X, init_state, weights, biases):
+def RNN(X, weights, biases):
     # transpose the inputs shape from
     # (batch_size=128, n_steps=28, n_inputs=28) = (128, 28, 28)
     # to (n_steps, batch_size, n_inputs) = (28, 128, 28)
@@ -59,13 +54,15 @@ def RNN(X, init_state, weights, biases):
     # (28*128, 128)==> steps=28 * (batch=128, hidden=128)
     X = tf.split(0, n_steps, X)
     # ==> a list of X. [X1, X2, ..., X28] 28 steps
-    lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(n_hidden_unis, forget_bias=1.0)
-    outputs, states = tf.nn.rnn(lstm_cell, X, initial_state=init_state)
+    lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(n_hidden_unis, forget_bias=1.0, state_is_tuple=True)
+    if not hasattr(RNN, '_init_state'):
+        RNN._init_state = lstm_cell.zero_state(batch_size, dtype=tf.float32)
+    outputs, states = tf.nn.rnn(lstm_cell, X, initial_state=RNN._init_state, )
     # return final outputs
     return tf.matmul(outputs[-1], weights['out']) + biases['out']
 
 
-pred = RNN(x, init_state, weights, biases)
+pred = RNN(x, weights, biases)
 cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(pred, y))
 train_op = tf.train.AdamOptimizer(lr).minimize(cost)
 
@@ -75,17 +72,21 @@ accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 init = tf.initialize_all_variables()
 with tf.Session() as sess:
     sess.run(init)
-    step = 1
+    step = 0
     while step * batch_size < training_iters:
         batch_xs, batch_ys = mnist.train.next_batch(batch_size)
         batch_xs = batch_xs.reshape([batch_size, n_steps, n_inputs])
         sess.run(train_op, feed_dict={
             x: batch_xs,
             y: batch_ys,
-            init_state: np.zeros((batch_size, 2*n_hidden_unis))
         })
+        if step % 10 == 0:
+            print(sess.run(accuracy, feed_dict={
+            x: batch_xs,
+            y: batch_ys,
+        }))
 
-
+        step += 1
 
 
 

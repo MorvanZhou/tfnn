@@ -33,15 +33,14 @@ evaluator = tfnn.Evaluator(network)
 # set summarizer at the end of neural structure, and visualize results in tensorboard
 summarizer = tfnn.Summarizer(network, save_path='/tmp',)
 
-for i in range(1000):
-    b_xs, b_ys = train_data.next_batch(100, loop=True)
+for i in range(22):
+    b_xs, b_ys = train_data.next_batch(100)
     # train with keep probability of 0.5
     network.run_step(b_xs, b_ys, 0.5)
     if i % 10 == 0:
         # record
         print('accuracy:', evaluator.compute_accuracy(b_xs, b_ys))
         summarizer.record_train(b_xs, b_ys)
-
 # visualize it on tensorborad
 summarizer.web_visualize()
 

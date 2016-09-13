@@ -11,9 +11,11 @@ plt.style.use('ggplot')
 class Evaluator(object):
     def __init__(self, network, ):
         self.network = network
-        self._set_accuracy()
-        self._set_r2()
-        self._set_confusion_metrics()
+        if isinstance(self.network, tfnn.RegNetwork):
+            self._set_r2()
+        if isinstance(self.network, tfnn.ClfNetwork):
+            self._set_confusion_metrics()
+            self._set_accuracy()
 
     def compute_r2(self, xs, ys):
         feed_dict = self.get_feed_dict(xs, ys)
@@ -147,52 +149,49 @@ class Evaluator(object):
 
     def _set_confusion_metrics(self):
         # from https://cloud.google.com/solutions/machine-learning-with-financial-time-series-data
-        if not isinstance(self.network, tfnn.ClfNetwork):
-            raise TypeError('confusion metrics is for classification problem')
-        else:
-            # for onehot data
-            with tfnn.name_scope('f1_score'):
-                predictions = tfnn.argmax(self.network.predictions, 1)
-                actuals = tfnn.argmax(self.network.target_placeholder, 1)
+        # for onehot data
+        with tfnn.name_scope('f1_score'):
+            predictions = tfnn.argmax(self.network.predictions, 1)
+            actuals = tfnn.argmax(self.network.target_placeholder, 1)
 
-                ones_like_actuals = tfnn.ones_like(actuals)
-                zeros_like_actuals = tfnn.zeros_like(actuals)
-                ones_like_predictions = tfnn.ones_like(predictions)
-                zeros_like_predictions = tfnn.zeros_like(predictions)
+            ones_like_actuals = tfnn.ones_like(actuals)
+            zeros_like_actuals = tfnn.zeros_like(actuals)
+            ones_like_predictions = tfnn.ones_like(predictions)
+            zeros_like_predictions = tfnn.zeros_like(predictions)
 
-                tp = tfnn.reduce_sum(
-                    tfnn.cast(
-                        tfnn.logical_and(
-                            tfnn.equal(actuals, ones_like_actuals),
-                            tfnn.equal(predictions, ones_like_predictions)
-                        ), "float"))
+            tp = tfnn.reduce_sum(
+                tfnn.cast(
+                    tfnn.logical_and(
+                        tfnn.equal(actuals, ones_like_actuals),
+                        tfnn.equal(predictions, ones_like_predictions)
+                    ), "float"))
 
-                tn = tfnn.reduce_sum(
-                    tfnn.cast(
-                        tfnn.logical_and(
-                            tfnn.equal(actuals, zeros_like_actuals),
-                            tfnn.equal(predictions, zeros_like_predictions)
-                        ), "float"))
+            tn = tfnn.reduce_sum(
+                tfnn.cast(
+                    tfnn.logical_and(
+                        tfnn.equal(actuals, zeros_like_actuals),
+                        tfnn.equal(predictions, zeros_like_predictions)
+                    ), "float"))
 
-                fp = tfnn.reduce_sum(
-                    tfnn.cast(
-                        tfnn.logical_and(
-                            tfnn.equal(actuals, zeros_like_actuals),
-                            tfnn.equal(predictions, ones_like_predictions)
-                        ), "float"))
+            fp = tfnn.reduce_sum(
+                tfnn.cast(
+                    tfnn.logical_and(
+                        tfnn.equal(actuals, zeros_like_actuals),
+                        tfnn.equal(predictions, ones_like_predictions)
+                    ), "float"))
 
-                fn = tfnn.reduce_sum(
-                    tfnn.cast(
-                        tfnn.logical_and(
-                            tfnn.equal(actuals, ones_like_actuals),
-                            tfnn.equal(predictions, zeros_like_predictions)
-                        ), "float"))
+            fn = tfnn.reduce_sum(
+                tfnn.cast(
+                    tfnn.logical_and(
+                        tfnn.equal(actuals, ones_like_actuals),
+                        tfnn.equal(predictions, zeros_like_predictions)
+                    ), "float"))
 
-                self.recall = tp / (tp + fn)
-                self.precision = tp / (tp + fp)
+            self.recall = tp / (tp + fn)
+            self.precision = tp / (tp + fp)
 
-                self.f1 = tfnn.div(2 * (self.precision * self.recall),
-                                   (self.precision + self.recall), name='f1_score')
-                tfnn.scalar_summary('f1_score', self.f1)
-                tfnn.scalar_summary('precision', self.precision)
-                tfnn.scalar_summary('recall', self.recall)
+            self.f1 = tfnn.div(2 * (self.precision * self.recall),
+                               (self.precision + self.recall), name='f1_score')
+            tfnn.scalar_summary('f1_score', self.f1)
+            tfnn.scalar_summary('precision', self.precision)
+            tfnn.scalar_summary('recall', self.recall)

@@ -9,6 +9,16 @@ class RegNetwork(Network):
         super(RegNetwork, self).__init__(
             input_size, output_size, do_dropout, do_l2, ntype='RNet')
         self.name = 'RegressionNetwork'
+        self._para = {
+            'input_size': input_size,
+            'output_size': output_size,
+            'do_dropout': do_dropout,
+            'do_l2': do_l2,
+        }
+        self.layers_configs['para'] = [self._para]
+
+    def __str__(self):
+        return self.name
 
     def _init_loss(self):
         with tfnn.name_scope('predictions'):
