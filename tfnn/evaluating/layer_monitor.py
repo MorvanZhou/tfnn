@@ -72,7 +72,7 @@ class LayerMonitor(Monitor):
         plt.show()
 
     def monitoring(self, t_xs, t_ys):
-        all_Ws = self._network.get_W()
+        all_Ws = self._network.Ws
         feed_dict = self.evaluator.get_feed_dict(t_xs, t_ys)
         all_outputs = self._network.sess.run(self._outputs4run,
                                              feed_dict=feed_dict)

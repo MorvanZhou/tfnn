@@ -17,6 +17,31 @@ class Evaluator(object):
             self._set_confusion_metrics()
             self._set_accuracy()
 
+    def compute_scores(self, scores, xs, ys):
+        if isinstance(scores, str):
+            scores = [scores]
+        if not isinstance(scores, (list, tuple)):
+            raise TypeError('Scores must be a string or a tuple or a list of strings')
+        scores_ops = []
+        for score in scores:
+            score = score.lower()
+            if score == 'r2':
+                scores_ops.append(self.r2)
+            elif score == 'cost':
+                scores_ops.append(self.network.loss)
+            elif score == 'f1':
+                scores_ops.append(self.f1)
+            elif score == 'recall':
+                scores_ops.append(self.recall)
+            elif score == 'precision':
+                scores_ops.append(self.precision)
+            elif score == 'accuracy':
+                scores_ops.append(self.accuracy)
+            else:
+                raise ValueError('Do not have %s score' % score)
+        feed_dict = self.get_feed_dict(xs, ys)
+        return self.network.sess.run(scores_ops, feed_dict=feed_dict)
+
     def compute_r2(self, xs, ys):
         feed_dict = self.get_feed_dict(xs, ys)
         return self.r2.eval(feed_dict, self.network.sess)

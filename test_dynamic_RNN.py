@@ -1,3 +1,14 @@
+'''
+A Dynamic Recurrent Neural Network (LSTM) implementation example using
+TensorFlow library. This example is using a toy dataset to classify linear
+sequences. The generated sequences have variable length.
+Long Short Term Memory paper: http://deeplearning.cs.cmu.edu/pdfs/Hochreiter97_lstm.pdf
+Author: Aymeric Damien
+Project: https://github.com/aymericdamien/TensorFlow-Examples/
+'''
+
+from __future__ import print_function
+
 import tensorflow as tf
 import random
 
@@ -69,72 +80,71 @@ class ToySequenceData(object):
 learning_rate = 0.01
 training_iters = 1000000
 batch_size = 128
-display_step = 10
 
 # Network Parameters
 seq_max_len = 20 # Sequence max length
 n_hidden = 64 # hidden layer num of features
 n_classes = 2 # linear sequence or not
-
+n_inputs = 1
 trainset = ToySequenceData(n_samples=1000, max_seq_len=seq_max_len)
 testset = ToySequenceData(n_samples=500, max_seq_len=seq_max_len)
 
 # tf Graph input
-x = tf.placeholder("float", [None, seq_max_len, 1])
+x = tf.placeholder("float", [None, seq_max_len, n_inputs])
 y = tf.placeholder("float", [None, n_classes])
 # A placeholder for indicating each sequence length
-
-
+seqlen = tf.placeholder(tf.int32, [None])
 
 # Define weights
 weights = {
+    'in': tf.Variable(tf.random_normal([n_inputs, n_hidden])),
     'out': tf.Variable(tf.random_normal([n_hidden, n_classes]))
 }
 biases = {
-    'out': tf.Variable(tf.random_normal([n_classes]))
+    'in': tf.Variable(tf.constant(0.1, shape=[n_hidden, ])),
+    'out': tf.Variable(tf.random_normal([n_classes, ]))
 }
 
 
-def dynamicRNN(x,weights, biases):
+def dynamicRNN(x, seqlen, weights, biases):
+    # inputs to cell
+    x = tf.reshape(x, [-1, n_inputs])
 
-    # Permuting batch_size and n_steps
-    x = tf.transpose(x, [1, 0, 2])
-    # Reshaping to (n_steps*batch_size, n_input)
-    x = tf.reshape(x, [-1, 1])
-    # Split to get a list of 'n_steps' tensors of shape (batch_size, n_input)
-    x = tf.split(0, seq_max_len, x)
+    # into hidden
+    # X_in = (128 batch * 28 steps, 128 hidden)
+    x_in = tf.matmul(x, weights['in']) + biases['in']
+    # X_in ==> (128 batch, 28 steps, 128 hidden)
+    x_in = tf.reshape(x_in, [-1, seq_max_len, n_hidden])
 
-    # Define a lstm cell with tensorflow
-    lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(n_hidden)
+    lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(n_hidden, state_is_tuple=True)
 
-    # Get lstm cell output, providing 'sequence_length' will perform dynamic
-    # calculation.
-    seqlen = length(x)
-    outputs, states = tf.nn.rnn(lstm_cell, x, dtype=tf.float32,
-                                sequence_length=seqlen)
+    # zero state (batch size, n_hidden)
+    _initial_state = lstm_cell.zero_state(tf.shape(seqlen)[0], tf.float32)
 
-    # When performing dynamic calculation, we must retrieve the last
-    # dynamically computed output, i.e., if a sequence length is 10, we need
-    # to retrieve the 10th output.
-    # However TensorFlow doesn't support advanced indexing yet, so we build
-    # a custom op that for each sample in batch size, get its length and
-    # get the corresponding relevant output.
+    # outputs (batch_size, time_steps, n_inputs)
+    outputs, states = tf.nn.dynamic_rnn(lstm_cell, x_in, dtype=tf.float32,
+                                        sequence_length=seqlen, time_major=False,
+                                        initial_state=_initial_state)
 
-    # 'outputs' is a list of output at every timestep, we pack them in a Tensor
-    # and change back dimension to [batch_size, n_step, n_input]
-    outputs = tf.transpose(tf.pack(outputs), [1, 0, 2])
+    # transposed outputs (steps, batch, outputs)
+    # outputs_transposed = tf.transpose(outputs, [1, 0, 2])
+    # (batch, outputs)
+    # outputs_gathered = tf.gather_nd(outputs, )
+    # outputs_reshaped = tf.reshape(outputs_gathered, [-1, n_hidden])
+    # # unpack to list [(batch, outputs)..] * steps
+    # outputs_unpack = tf.unpack(outputs_transposed)
 
-    # Hack to build the indexing and retrieve the right output.
-    batch_size = tf.shape(outputs)[0]
-    # Start indices for each sample
-    index = tf.range(0, batch_size) * seq_max_len + (seqlen - 1)
-    # Indexing
-    outputs = tf.gather(tf.reshape(outputs, [-1, n_hidden]), index)
+    # _batch_size = tf.shape(outputs)[0]
+    # # Start indices for each sample
+    # index = tf.range(0, _batch_size) * seq_max_len + (seqlen - 1)
+    # # Indexing
+    # # (batch, n_hidden)
+    # outputs_gathered = tf.gather(tf.reshape(outputs, [-1, n_hidden]), index)    # states is the last outputs in every seqlen
 
     # Linear activation, using outputs computed above
-    return [tf.matmul(outputs, weights['out']) + biases['out'], index]
+    return [tf.matmul(states[1], weights['out']) + biases['out'], outputs, states[1]]
 
-pred, len1 = dynamicRNN(x, weights, biases)
+pred, o, s = dynamicRNN(x, seqlen, weights, biases)
 
 # Define loss and optimizer
 cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(pred, y))
@@ -150,16 +160,21 @@ init = tf.initialize_all_variables()
 # Launch the graph
 with tf.Session() as sess:
     sess.run(init)
-    step = 1
+    step = 0
     # Keep training until reach max iterations
     while step * batch_size < training_iters:
         batch_x, batch_y, batch_seqlen = trainset.next(batch_size)
         # Run optimization op (backprop)
-        sess.run(optimizer, feed_dict={x: batch_x, y: batch_y,})
-        if step % display_step == 0:
-            # Calculate batch accuracy and cost
-            acc, loss, lenenen = sess.run([accuracy, cost, len1], feed_dict={x: batch_x, y: batch_y,})
+        _, o_, s_ = sess.run([optimizer, o, s], feed_dict={x: batch_x, y: batch_y,
+                                       seqlen: batch_seqlen})
 
+        if step % 30 == 0:
+            # Calculate batch accuracy
+            acc = sess.run(accuracy, feed_dict={x: batch_x, y: batch_y,
+                                                seqlen: batch_seqlen})
+            # Calculate batch loss
+            loss = sess.run(cost, feed_dict={x: batch_x, y: batch_y,
+                                             seqlen: batch_seqlen})
             print("Iter " + str(step*batch_size) + ", Minibatch Loss= " + \
                   "{:.6f}".format(loss) + ", Training Accuracy= " + \
                   "{:.5f}".format(acc))
@@ -170,5 +185,5 @@ with tf.Session() as sess:
     test_data = testset.data
     test_label = testset.labels
     test_seqlen = testset.seqlen
-    print("Testing Accuracy:", \
-        sess.run(accuracy, feed_dict={x: test_data, y: test_label,}))
+    print("Testing Accuracy:", sess.run(accuracy, feed_dict={x: test_data, y: test_label,
+                                      seqlen: test_seqlen}))

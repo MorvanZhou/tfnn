@@ -96,7 +96,7 @@ class ScaleMonitor(Monitor):
                                                                       ls='--',
                                                                       lw=2, label=r'$Test$')
         for _name in object_names:
-            if _name in ['r2', 'accuracy', 'f1']:
+            if _name in ['r2', 'accuracy', 'f1', 'recall', 'precision']:
                 self._axes[_name].legend(loc='lower right')
             elif _name == 'cost':
                 self._axes[_name].legend(loc='upper right')

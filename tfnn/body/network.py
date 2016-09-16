@@ -125,14 +125,14 @@ class Network(object):
                 exp_decay['staircase'] = False
             if 'name' not in exp_decay:
                 exp_decay['name'] = None
-            self.lr = tfnn.train.exponential_decay(lr, self.global_step,
+            self._lr = tfnn.train.exponential_decay(lr, self.global_step,
                                                    decay_steps=exp_decay['decay_steps'],
                                                    decay_rate=exp_decay['decay_rate'],
                                                    staircase=exp_decay['staircase'],
                                                    name=exp_decay['name'])
         else:
-            self.lr = tfnn.constant(lr)
-        tfnn.scalar_summary('learning_rate', self.lr)
+            self._lr = tfnn.constant(lr)
+        tfnn.scalar_summary('learning_rate', self._lr)
 
     def set_optimizer(self, optimizer=None, *args, **kwargs):
         """
@@ -184,18 +184,6 @@ class Network(object):
         if self.layers_configs['type'][-1] != 'output':
             raise NotImplementedError('Please add output layer.')
 
-    def _check_init(self):
-        if not hasattr(self, '_init'):
-            if not hasattr(self, 'lr'):
-                self.set_learning_rate(0.001)
-            self.optimizer = self._optimizer(self.lr,  *self.optimizer_para[0], **self.optimizer_para[1])
-            with tfnn.name_scope('trian'):
-                self._train_op = self.optimizer.minimize(self.loss, self.global_step, name='train_op')
-            # initialize all variables
-            self._init = tfnn.initialize_all_variables()
-            self.sess = tfnn.Session()
-            self.sess.run(self._init)
-
     def run_step(self, feed_xs, feed_ys, *args, **kwargs):
         if np.ndim(feed_xs) == 1:
             feed_xs = feed_xs[np.newaxis, :]
@@ -210,65 +198,6 @@ class Network(object):
         for _ in range(steps):
             b_xs, b_ys = train_data.next_batch(100)
             self.run_step(feed_xs=b_xs, feed_ys=b_ys, *args, **kwargs)
-
-    def get_loss(self, xs, ys):
-        _feed_dict = self._get_feed_dict(xs, ys, keep_prob=1., l2_value=0.)
-        _loss_value = self.sess.run(self.loss, feed_dict=_feed_dict)
-        return _loss_value
-
-    def get_W(self, n_layer=None):
-        if not(n_layer is None or type(n_layer) is int):
-            raise TypeError('layer must to be None or int')
-        if n_layer is None:
-            _Ws = []
-            for layer in self.layers_results['Layer'][1:]:
-                _W = self.sess.run(layer.W)
-                _Ws.append(_W)
-        else:
-            if n_layer >= len(self.layers_results):
-                raise IndexError('Do not have layer %i' % n_layer)
-            _Ws = self.sess.run(self.layers_results['Layer'][1:][n_layer].W)
-        return _Ws
-
-    def get_Wshape(self, n_layer=None):
-        if not(n_layer is None or type(n_layer) is int):
-            raise TypeError('layer must to be None or int')
-        if n_layer is None:
-            _Wshape = []
-            for layer in self.layers_results['Layer'][1:]:
-                _Wshape.append(layer.W.get_shape())
-        else:
-            if n_layer >= len(self.layers_results):
-                raise IndexError('Do not have layer %i' % n_layer)
-            _Wshape = self.layers_results['Layer'][1:][n_layer].W.get_shape()
-        return _Wshape
-
-    def get_b(self, n_layer=None):
-        if not(n_layer is None or type(n_layer) is int):
-            raise TypeError('layer need to be None or int')
-        if n_layer is None:
-            _bs = []
-            for layer in self.layers_results['Layer'][1:]:
-                _b = self.sess.run(layer.b)
-                _bs.append(_b)
-        else:
-            if n_layer >= len(self.layers_results):
-                raise IndexError('Do not have layer %i' % n_layer)
-            _bs = self.sess.run(self.layers_results['Layer'][1:][n_layer].b)
-        return _bs
-
-    def get_bshape(self, n_layer=None):
-        if not(n_layer is None or type(n_layer) is int):
-            raise TypeError('layer must to be None or int')
-        if n_layer is None:
-            _bshape = []
-            for layer in self.layers_results['Layer'][1:]:
-                _bshape.append(layer.b.get_shape())
-        else:
-            if n_layer >= len(self.layers_results):
-                raise IndexError('Do not have layer %i' % n_layer)
-            _bshape = self.layers_results['Layer'][1:][n_layer].b.get_shape()
-        return _bshape
 
     def predict(self, *args, **kwargs):
         raise NotImplementedError("Abstract method")
@@ -287,6 +216,18 @@ class Network(object):
         for key in layer.results_dict.keys():
             self.layers_results[key].append(layer.results_dict[key])
 
+    def _check_init(self):
+        if not hasattr(self, '_init'):
+            if not hasattr(self, 'lr'):
+                self.set_learning_rate(0.001)
+            self.optimizer = self._optimizer(self._lr,  *self.optimizer_para[0], **self.optimizer_para[1])
+            with tfnn.name_scope('trian'):
+                self._train_op = self.optimizer.minimize(self.loss, self.global_step, name='train_op')
+            # initialize all variables
+            self._init = tfnn.initialize_all_variables()
+            self.sess = tfnn.Session()
+            self.sess.run(self._init)
+
     def _init_loss(self):
         """do not use in network.py"""
         self.loss = None
@@ -298,8 +239,8 @@ class Network(object):
             else:
                 kp = kwargs['keep_prob']
 
-            if not hasattr(self, 'keep_prob'):
-                self.keep_prob = tfnn.constant(kp)
+            if not hasattr(self, '_keep_prob'):
+                self._keep_prob = tfnn.constant(kp)
 
             _feed_dict = {
                 self.data_placeholder: xs,
@@ -312,8 +253,8 @@ class Network(object):
             else:
                 l2_value = kwargs['l2_value']
 
-            if not hasattr(self, 'l2_value'):
-                self.l2_value = tfnn.constant(l2_value)
+            if not hasattr(self, '_l2_value'):
+                self._l2_value = tfnn.constant(l2_value)
 
             _feed_dict = {
                 self.data_placeholder: xs,
@@ -335,4 +276,82 @@ class Network(object):
         self.build_layers(_layers)
         return self
 
+    def __len__(self):
+        """ return the number of layers that are added to network """
+        return len(self.layers_configs['type']) - 1
 
+    @property
+    def lr(self):
+        return self._lr
+
+    @property
+    def keep_prob(self):
+        return self._keep_prob
+
+    @property
+    def l2_value(self):
+        return self._l2_value
+
+    @property
+    def Ws(self, n_layer=None):
+        if not (n_layer is None or type(n_layer) is int):
+            raise TypeError('layer must to be None or int')
+        if n_layer is None:
+            _Ws = []
+            for layer in self.layers_results['Layer'][1:]:
+                _W = self.sess.run(layer.W)
+                _Ws.append(_W)
+        else:
+            if n_layer >= len(self.layers_results):
+                raise IndexError('Do not have layer %i' % n_layer)
+            _Ws = self.sess.run(self.layers_results['Layer'][1:][n_layer].W)
+        return _Ws
+
+    @property
+    def Wshape(self, n_layer=None):
+        if not (n_layer is None or type(n_layer) is int):
+            raise TypeError('layer must to be None or int')
+        if n_layer is None:
+            _Wshape = []
+            for layer in self.layers_results['Layer'][1:]:
+                _Wshape.append(layer.W.get_shape())
+        else:
+            if n_layer >= len(self.layers_results):
+                raise IndexError('Do not have layer %i' % n_layer)
+            _Wshape = self.layers_results['Layer'][1:][n_layer].W.get_shape()
+        return _Wshape
+
+    @property
+    def bs(self, n_layer=None):
+        if not (n_layer is None or type(n_layer) is int):
+            raise TypeError('layer need to be None or int')
+        if n_layer is None:
+            _bs = []
+            for layer in self.layers_results['Layer'][1:]:
+                _b = self.sess.run(layer.b)
+                _bs.append(_b)
+        else:
+            if n_layer >= len(self.layers_results):
+                raise IndexError('Do not have layer %i' % n_layer)
+            _bs = self.sess.run(self.layers_results['Layer'][1:][n_layer].b)
+        return _bs
+
+    @property
+    def bshape(self, n_layer=None):
+        if not (n_layer is None or type(n_layer) is int):
+            raise TypeError('layer must to be None or int')
+        if n_layer is None:
+            _bshape = []
+            for layer in self.layers_results['Layer'][1:]:
+                _bshape.append(layer.b.get_shape())
+        else:
+            if n_layer >= len(self.layers_results):
+                raise IndexError('Do not have layer %i' % n_layer)
+            _bshape = self.layers_results['Layer'][1:][n_layer].b.get_shape()
+        return _bshape
+
+    @property
+    def error(self, xs, ys):
+        _feed_dict = self._get_feed_dict(xs, ys, keep_prob=1., l2_value=0.)
+        _error_value = self.sess.run(self.loss, feed_dict=_feed_dict)
+        return _error_value
