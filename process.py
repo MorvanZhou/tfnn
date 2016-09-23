@@ -9,8 +9,8 @@ def select_lane(path, lane=1):
     lane_data = data[data.Lane_Identification == lane].reset_index(drop=True)
     lane_read = lane_data.copy()
 
-    # lane1_data.to_csv('preprocessing/s.csv')
-    # lane1_data = pd.read_csv('preprocessing/s.csv', index_col=0)
+    # lane1_data.to_csv('datasets/s.csv')
+    # lane1_data = pd.read_csv('datesets/s.csv', index_col=0)
     print(lane_data.head())
     all_time_data = pd.DataFrame()
     time_data = pd.DataFrame()
@@ -53,10 +53,10 @@ def select_lane(path, lane=1):
         delta_xs = delta_xs.append(delta_x)
     lane_data.insert(7, 'delta_x', delta_xs)
     print(lane_data.head())
-    # lane1_data.to_csv('preprocessing/s3.csv')
+    # lane1_data.to_csv('datasets/s3.csv')
     lane_data.to_pickle(path[:17]+'_lane%s.pickle' % lane)
 
 if __name__ == '__main__':
-    path = 'preprocessing/I80-0400-0415-filter_0.8_T_v_ldxdvh.pickle'
+    path = 'datasets/I80-0400-0415-filter_0.8_T_v_ldxdvh.pickle'
     select_lane(path, lane=5)
 

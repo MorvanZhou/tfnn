@@ -45,9 +45,9 @@ def plot_data(df, id=2000):
 
     plt.show()
 
-df = pd.read_pickle('preprocessing/I80-0500-0515-filter_0.8_T_v_ldxdvh.pickle')
+df = pd.read_pickle('datasets/I80-0500-0515-filter_0.8_T_v_ldxdvh.pickle')
 df1 = df[df.Lane_Identification == 2]
-# df2 = pd.read_pickle('preprocessing/I80-0500-0515.pickle')
+# df2 = pd.read_pickle('datasets/I80-0500-0515.pickle')
 # df2 = df2[df2.Lane_Identification == 2]
 plot_traj(df1)
 # plot_data(df1, id=1050)

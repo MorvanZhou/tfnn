@@ -1,7 +1,7 @@
 import tfnn
 import matplotlib.pyplot as plt
 import numpy as np
-from tfnn.evaluating.scale_monitor import ScaleMonitor
+from tfnn.evaluating.scalar_monitor import ScaleMonitor
 from tfnn.evaluating.layer_monitor import LayerMonitor
 from tfnn.evaluating.data_fitting_monitor import DataFittingMonitor
 from tfnn.evaluating.line_fitting_monitor import LineFittingMonitor

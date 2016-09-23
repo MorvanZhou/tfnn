@@ -5,7 +5,7 @@ import time
 plt.style.use('ggplot')
 
 
-def extract(path='preprocessing/I80-0400-0415.txt', to_pickle=True):
+def extract(path='datasets/I80-0400-0415.txt', to_pickle=True):
     columns_name = \
         ['Vehicle_ID', 'Frame_ID', 'Total_Frames', 'Global_Time', 'Local_X', 'Local_Y',
          'Global_X', 'Global_Y', 'Vehicle_Length', 'Vehicle_Width', 'Vehicle_Class', 'Vehicle_Velocity',
@@ -301,22 +301,22 @@ def extract_v_l_dx_dv_h(path, save=False):
 
 
 if __name__ == '__main__':
-    # path = 'preprocessing/I80-0500-0515.txt'
+    # path = 'datasets/I80-0500-0515.txt'
     # extract(path=path)
 
     # select 3000-3300 car example
-    # data = pd.read_pickle('preprocessing/I80-0400-0415.pickle').iloc[1096646:1236558, :]
+    # data = pd.read_pickle('datasets/I80-0400-0415.pickle').iloc[1096646:1236558, :]
     # select_T(data)
     # filter_x(data, alpha=17, T=1.5)
     # filter_x_v_a(data, 4)
 
-    path = 'preprocessing/I80-0500-0515.pickle'
+    path = 'datasets/I80-0500-0515.pickle'
     batch_filter(path, T=0.8, selected_filter='f_x', clip_bound=(-3.41376, 3.41376), save=True)
 
-    # path = 'preprocessing/I80-0400-0415-filter_0.8_T.pickle'
+    # path = 'datasets/I80-0400-0415-filter_0.8_T.pickle'
     # data = pd.read_pickle(path)
     # plot_comparison(data, alpha=2, which='a')
     # differentiation(data, 2)
 
-    # path = 'preprocessing/I80-0400-0415-filter_0.8_T.pickle'
+    # path = 'datasets/I80-0400-0415-filter_0.8_T.pickle'
     # extract_v_l_dx_dv_h(path, save=True)
