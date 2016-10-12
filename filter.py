@@ -205,19 +205,19 @@ def differentiation(data, alpha):
     a = (v1 - v0) / .2
     a = a.shift(1)
 
-    v = v.rename('1st order diff equ of filtered Y')
-    a = a.rename('2nd order diff equ of filtered Y')
-    # start = 5
+    v = v.rename('1st order diff equ of unfiltered Y')
+    a = a.rename('2nd order diff equ of unfiltered Y')
+    start = 5
     plt.figure(0)
     vehicle['Local_Y'].plot(c='r')
-    # vehicle['filter_position'].iloc[start:].plot(c='b')
+    vehicle['filter_position'].iloc[start:].plot(c='b')
     plt.xlabel('time')
     plt.ylabel('position')
     plt.legend(loc='best')
 
     plt.figure(1)
     vehicle['Vehicle_Velocity'].plot(c='r')
-    # vehicle['filter_velocity'].iloc[start:].plot(c='g')
+    vehicle['deri_v'].iloc[start:].plot(c='g')
     v.plot(c='b')
     plt.xlabel('time')
     plt.ylabel('velocity')
@@ -226,7 +226,7 @@ def differentiation(data, alpha):
     plt.figure(2)
     vehicle['Vehicle_Acceleration'].plot(c='r')
     a.plot(c='b')
-    # vehicle['filter_acceleration'].iloc[start:].plot(c='g')
+    vehicle['deri_a_clipped'].iloc[start:].plot(c='g')
     plt.legend()
     plt.xlabel('time')
     plt.ylabel('acceleration')
@@ -310,13 +310,13 @@ if __name__ == '__main__':
     # filter_x(data, alpha=17, T=1.5)
     # filter_x_v_a(data, 4)
 
-    path = 'datasets/I80-0500-0515.pickle'
-    batch_filter(path, T=0.8, selected_filter='f_x', clip_bound=(-3.41376, 3.41376), save=True)
+    # path = 'datasets/I80-0500-0515.pickle'
+    # batch_filter(path, T=0.8, selected_filter='f_x', clip_bound=(-3.41376, 3.41376), save=True)
 
-    # path = 'datasets/I80-0400-0415-filter_0.8_T.pickle'
-    # data = pd.read_pickle(path)
+    path = 'datasets/I80-0400-0415-filter_0.8_T.pickle'
+    data = pd.read_pickle(path)
     # plot_comparison(data, alpha=2, which='a')
-    # differentiation(data, 2)
+    differentiation(data,4)
 
     # path = 'datasets/I80-0400-0415-filter_0.8_T.pickle'
     # extract_v_l_dx_dv_h(path, save=True)
