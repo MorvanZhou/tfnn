@@ -14,16 +14,16 @@ def train(data_path, duration, save_to='/tmp/'):
         lane_data = pd.read_pickle(lane_path).dropna().astype(np.float32)
         load_data = pd.concat([load_data, lane_data], axis=0, ignore_index=True)
     xs = pd.concat([
-        # load_data.iloc[:, -60-int(duration*10):-60],        # speed
+        load_data.iloc[:, -60-int(duration*10):-60],        # speed
         load_data.iloc[:, -40-int(duration*10):-40],        # leader speed
         load_data.iloc[:, -20-int(duration*10):-20],        # spacing
-        load_data.iloc[:, -int(duration*10):]              # relative speed
+        # load_data.iloc[:, -int(duration*10):]              # relative speed
         ], axis=1)
     print(xs.shape)
     print(xs.head(2))
     print('sample size:', load_data.shape[0])
-    ys = load_data['deri_v']
-    # ys = load_data['deri_a_clipped']
+    # ys = load_data['deri_v']
+    ys = load_data['deri_a_clipped']
     # ys = load_data['delta_x']
     data = tfnn.Data(xs, ys, name='road_data')
 
@@ -34,20 +34,19 @@ def train(data_path, duration, save_to='/tmp/'):
     network.add_hidden_layer(100, activator=tfnn.nn.relu, dropout_layer=False)
     network.add_hidden_layer(10, activator=tfnn.nn.relu, dropout_layer=False)
     network.add_output_layer(activator=None, dropout_layer=False)
-    global_step = tfnn.Variable(0, trainable=False)
     # lr = tfnn.train.exponential_decay(0.001, global_step, 5000, 0.9, staircase=False)
-    optimizer = tfnn.train.AdamOptimizer(0.001)
-    network.set_optimizer(optimizer, global_step)
+    network.set_optimizer('Adam')
+    network.set_learning_rate(0.001)
     evaluator = tfnn.Evaluator(network)
-    summarizer = tfnn.Summarizer(network, save_path='/tmp/', include_test=True)
+    summarizer = tfnn.Summarizer(network, save_path='/tmp/')
 
     for i in range(30000):
-        b_xs, b_ys = t_data.next_batch(50, loop=True)
+        b_xs, b_ys = t_data.next_batch(50)
         network.run_step(b_xs, b_ys, 0.5)
         if i % 2000 == 0:
             print(evaluator.compute_cost(v_data.xs, v_data.ys))
-            summarizer.record_train(b_xs, b_ys, i, 0.5)
-            summarizer.record_test(v_data.xs, v_data.ys, i)
+            summarizer.record_train(b_xs, b_ys,)
+            summarizer.record_test(v_data.xs, v_data.ys)
     network.save(path='tmp', name=save_to, replace=True)
     network.sess.close()
     evaluator.hold_plot()
@@ -241,12 +240,14 @@ def traj_comparison(data_path, duration, id, model_path='tmp', model='/model',
                 # speed, leader_speed, dx
                 # [furthest, nearest]
                 input_data = pd.concat([v_data, vl_data, dx_data])
-                a = network.predict(network.normalizer.fit_transform(input_data))
-                new_speed = test_vs.loc[t - 1, i] + a * 0.1
-                new_speed = 0 if new_speed < 0 else new_speed
-                test_ps.loc[t, i] = test_ps.loc[t - 1, i] + (test_vs.loc[t - 1, i] + new_speed) / 2 * 0.1
-                test_vs.loc[t, i] = new_speed
-                test_accs.loc[t, i] = a
+                new_a = network.predict(network.normalizer.fit_transform(input_data))
+
+                speed_t2 = test_vs.loc[t, i] + new_a * 0.2
+                speed_t2 = 0 if speed_t2 < 0 else speed_t2
+
+                test_accs.loc[t + 1, i] = new_a
+                test_vs.loc[t + 2, i] = speed_t2
+                test_ps.loc[t + 3, i] = test_ps.loc[t + 1, i] + speed_t2 * 0.2
             elif predict == 'v':
                 # leader_speed, dx, dv
                 # [furthest, nearest]
@@ -257,10 +258,12 @@ def traj_comparison(data_path, duration, id, model_path='tmp', model='/model',
                     dv_data,
                 ])
                 new_speed = network.predict(network.normalizer.fit_transform(input_data))
+
                 new_speed = 0 if new_speed < 0 else new_speed
-                test_ps.loc[t, i] = test_ps.loc[t - 1, i] + (test_vs.loc[t - 1, i] + new_speed) / 2 * 0.1
-                test_vs.loc[t, i] = new_speed
-                test_accs.loc[t, i] = (new_speed - test_vs.loc[t - 1, i]) / .1
+                test_vs.loc[t + 1, i] = new_speed  # next speed
+                test_ps.loc[t + 2, i] = test_ps.loc[t, i] + new_speed * 0.2  # next position
+                if not np.isnan(test_vs.loc[t - 1, i]):
+                    test_accs.loc[t, i] = (new_speed - test_vs.loc[t - 1, i]) / 0.2  # acceleration for now
             elif predict == 'delta_x':
                 """
                 !!!!
@@ -464,9 +467,9 @@ if __name__ == '__main__':
     # tfnn.set_random_seed(11)
     # np.random.seed(11)
     which_lane = [1, 3, 4]
-    path = ['preprocessing/I80-0400_lane%i.pickle' % lane for lane in which_lane]
+    path = ['datasets/I80-0400_lane%i.pickle' % lane for lane in which_lane]
     duration = 1
-    train(path, duration, save_to='/model%i/' % int(duration*10))
+    # train(path, duration, save_to='/model%i/' % int(duration*10))
 
     # test_path = 'preprocessing/I80-0400_lane2.pickle'
     # compare_real(test_path, duration, model_path='tmp', model='/model%i/' % int(duration*10))
@@ -476,7 +479,7 @@ if __name__ == '__main__':
     # cross_validation(path)
 
     # 512, 517, 418, 121, 191, 242, 392
-    lane_path = 'preprocessing/I80-0400_lane2.pickle'
+    lane_path = 'datasets/I80-0400_lane2.pickle'
     traj_comparison(lane_path, duration, id=890, model='/model%i/' % int(duration*10),
-                    on_test=True, predict='v')
+                    on_test=True, predict='a')
     # oscillation(lane_path, duration, id=890, model='/model%i/' % int(duration*10))
