@@ -10,7 +10,7 @@ class Layer(object):
         self.w_initial = w_initial
         self.name = name
         self.layer_type = layer_type
-        self._para = {
+        self._params = {
                  'activator': self.activator_name,
                  'dropout_layer': self.dropout_layer,
                  'name': self.name,
@@ -67,13 +67,13 @@ class Layer(object):
                 activated_product = self.activator(product)
             tfnn.histogram_summary(self.name + '/activated_product', activated_product)
 
-            _do_dropout = layers_configs['para'][0]['do_dropout']
+            _do_dropout = layers_configs['params'][0]['do_dropout']
             if _do_dropout and self.dropout_layer:
                 _keep_prob = layers_results['reg_value']
                 dropped_product = tfnn.nn.dropout(activated_product,
                                                   _keep_prob,
                                                   name='dropout')
-                final_product = tfnn.div(dropped_product, _keep_prob, name='recover_dropped')
+                final_product = dropped_product         # don't have to rescale it back, tf dropout has done this
             else:
                 dropped_product = None
                 final_product = activated_product
@@ -82,7 +82,7 @@ class Layer(object):
             'type': self.layer_type,
             'name': self.name,
             'neural_structure': {'input_size': _input_size, 'output_size': n_neurons},
-            'para': self._para,
+            'params': self._params,
         }
         self.results_dict = {
             'Layer': self,

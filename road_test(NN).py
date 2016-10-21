@@ -15,15 +15,15 @@ def train(data_path, duration, save_to='/tmp/'):
         load_data = pd.concat([load_data, lane_data], axis=0, ignore_index=True)
     xs = pd.concat([
         load_data.iloc[:, -60-int(duration*10):-60],        # speed
-        load_data.iloc[:, -40-int(duration*10):-40],        # leader speed
+        # load_data.iloc[:, -40-int(duration*10):-40],        # leader speed
         load_data.iloc[:, -20-int(duration*10):-20],        # spacing
-        # load_data.iloc[:, -int(duration*10):]              # relative speed
+        load_data.iloc[:, -int(duration*10):]              # relative speed
         ], axis=1)
     print(xs.shape)
     print(xs.head(2))
     print('sample size:', load_data.shape[0])
-    # ys = load_data['deri_v']
-    ys = load_data['deri_a_clipped']
+    ys = load_data['deri_v']
+    # ys = load_data['deri_a_clipped']
     # ys = load_data['delta_x']
     data = tfnn.Data(xs, ys, name='road_data')
 
@@ -36,17 +36,19 @@ def train(data_path, duration, save_to='/tmp/'):
     network.add_output_layer(activator=None, dropout_layer=False)
     # lr = tfnn.train.exponential_decay(0.001, global_step, 5000, 0.9, staircase=False)
     network.set_optimizer('Adam')
-    network.set_learning_rate(0.001)
+    network.set_learning_rate(1e-4, exp_decay=dict(decay_steps=3000, decay_rate=0.8))
     evaluator = tfnn.Evaluator(network)
-    summarizer = tfnn.Summarizer(network, save_path='/tmp/')
-
+    # summarizer = tfnn.Summarizer(network, save_path='/tmp/')
+    evaluator.set_data_fitting_monitor()
+    evaluator.set_scale_monitor(['cost', 'r2', 'learning rate'])
     for i in range(30000):
         b_xs, b_ys = t_data.next_batch(50)
         network.run_step(b_xs, b_ys, 0.5)
         if i % 2000 == 0:
             print(evaluator.compute_cost(v_data.xs, v_data.ys))
-            summarizer.record_train(b_xs, b_ys,)
-            summarizer.record_test(v_data.xs, v_data.ys)
+            evaluator.monitoring(b_xs, b_ys, v_xs=v_data.xs, v_ys=v_data.ys)
+            # summarizer.record_train(b_xs, b_ys,)
+            # summarizer.record_test(v_data.xs, v_data.ys)
     network.save(path='tmp', name=save_to, replace=True)
     network.sess.close()
     evaluator.hold_plot()
@@ -252,8 +254,8 @@ def traj_comparison(data_path, duration, id, model_path='tmp', model='/model',
                 # leader_speed, dx, dv
                 # [furthest, nearest]
                 input_data = pd.concat([
-                    # v_data,
-                    vl_data,
+                    v_data,
+                    # vl_data,
                     dx_data,
                     dv_data,
                 ])
@@ -287,22 +289,22 @@ def traj_comparison(data_path, duration, id, model_path='tmp', model='/model',
     plt.plot(test_ps.iloc[:, 1:], 'r--')
     plt.ylim((0, 400))
 
-    f, ax = plt.subplots(8, 1)
-    f.suptitle('Velocity')
-    for i in range(8):
-        ax[i].plot(vs.iloc[:, i + 1], 'k-')
-        ax[i].plot(test_vs.iloc[:, i + 1], 'r--')
-
-    f, ax = plt.subplots(8, 1)
-    f.suptitle('Acceleration')
-    for i in range(8):
-        ax[i].plot(accs.iloc[:, i+1], 'k-')
-        ax[i].plot(test_accs.iloc[:, i+1], 'r--')
-
-    f, ax = plt.subplots(8, 1)
-    f.suptitle('test real acceleration diff cumsum')
-    for i in range(8):
-        ax[i].plot((test_accs.iloc[:, i + 1]-accs.iloc[:, i + 1]).cumsum(), 'k-')
+    # f, ax = plt.subplots(8, 1)
+    # f.suptitle('Velocity')
+    # for i in range(8):
+    #     ax[i].plot(vs.iloc[:, i + 1], 'k-')
+    #     ax[i].plot(test_vs.iloc[:, i + 1], 'r--')
+    #
+    # f, ax = plt.subplots(8, 1)
+    # f.suptitle('Acceleration')
+    # for i in range(8):
+    #     ax[i].plot(accs.iloc[:, i+1], 'k-')
+    #     ax[i].plot(test_accs.iloc[:, i+1], 'r--')
+    #
+    # f, ax = plt.subplots(8, 1)
+    # f.suptitle('test real acceleration diff cumsum')
+    # for i in range(8):
+    #     ax[i].plot((test_accs.iloc[:, i + 1]-accs.iloc[:, i + 1]).cumsum(), 'k-')
 
     plt.show()
 
@@ -463,13 +465,19 @@ def cross_validation(path):
     plt.show()
 
 
+def set_seed(seed):
+    tfnn.set_random_seed(11)
+    np.random.seed(11)
+
+
+
 if __name__ == '__main__':
-    # tfnn.set_random_seed(11)
-    # np.random.seed(11)
-    which_lane = [1, 3, 4]
+    # set_seed(1)
+
+    which_lane = [1, 2, 3, 4]
     path = ['datasets/I80-0400_lane%i.pickle' % lane for lane in which_lane]
     duration = 1
-    # train(path, duration, save_to='/model%i/' % int(duration*10))
+    train(path, duration, save_to='/model%i/' % int(duration*10))
 
     # test_path = 'preprocessing/I80-0400_lane2.pickle'
     # compare_real(test_path, duration, model_path='tmp', model='/model%i/' % int(duration*10))
@@ -481,5 +489,5 @@ if __name__ == '__main__':
     # 512, 517, 418, 121, 191, 242, 392
     lane_path = 'datasets/I80-0400_lane2.pickle'
     traj_comparison(lane_path, duration, id=890, model='/model%i/' % int(duration*10),
-                    on_test=True, predict='a')
+                    on_test=True, predict='v')
     # oscillation(lane_path, duration, id=890, model='/model%i/' % int(duration*10))

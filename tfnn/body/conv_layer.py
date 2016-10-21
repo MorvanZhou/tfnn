@@ -62,7 +62,7 @@ class ConvLayer(Layer):
                 padding=self.pool_padding,
                 )
 
-        self._para = {
+        self._params = {
                 'patch_x': self.patch_x, 'patch_y': self.patch_y, 'n_filters': self.n_filters,
                 'activator': self.activator_name, 'strides': self.strides,
                 'padding': self.padding, 'pooling': self.pooling,
@@ -132,14 +132,14 @@ class ConvLayer(Layer):
                 image=activated_product, layer_size=_in_size, n_filters=self.n_filters)
             tfnn.histogram_summary(self.name + '/pooled_product', pooled_product)
 
-        _do_dropout = layers_configs['para'][0]['do_dropout']
+        _do_dropout = layers_configs['params'][0]['do_dropout']
         if _do_dropout and self.dropout_layer:
             _keep_prob = layers_results['reg_value']
             dropped_product = tfnn.nn.dropout(
                 pooled_product,
                 _keep_prob,
                 name='dropout')
-            final_product = tfnn.div(dropped_product, _keep_prob, name='recover_dropped')
+            final_product = dropped_product         # don't have to rescale it back, tf dropout has done this
         else:
             dropped_product = None
             final_product = pooled_product
@@ -148,7 +148,7 @@ class ConvLayer(Layer):
             'type': 'conv',
             'name': self.name,
             'neural_structure': {'input_size': _in_size, 'output_size': _out_size},
-            'para': self._para,
+            'params': self._params,
         }
         self.results_dict = {
             'Layer': self,

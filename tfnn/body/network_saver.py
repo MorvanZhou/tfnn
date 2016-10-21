@@ -121,16 +121,16 @@ class NetworkSaver(object):
         for index in range(len(layers_configs['type'])):
             if index == 0:
                 continue
-            para = layers_configs['para'][index]
+            params = layers_configs['params'][index]
             layer_type = layers_configs['type'][index]
             if layer_type == 'hidden':
-                network.add_hidden_layer(**para)
+                network.add_hidden_layer(**params)
             elif layer_type == 'fc':
-                network.add_fc_layer(**para)
+                network.add_fc_layer(**params)
             elif layer_type == 'output':
-                network.add_output_layer(**para)
+                network.add_output_layer(**params)
             elif layer_type == 'conv':
-                network.add_conv_layer(**para)
+                network.add_conv_layer(**params)
         network.sess = tfnn.Session()
         self._network = network
         _saver = tfnn.train.Saver()

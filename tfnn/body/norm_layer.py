@@ -10,7 +10,7 @@ class HiddenLayer(Layer):
                                           w_initial, name,
                                           layer_type='hidden')
         self.n_neurons = n_neurons
-        self._para['n_neurons'] = self.n_neurons
+        self._params['n_neurons'] = self.n_neurons
 
     def construct(self, layers_configs, layers_results):
         self._construct(self.n_neurons, layers_configs, layers_results)
@@ -29,7 +29,7 @@ class OutputLayer(Layer):
         net_type = layers_configs['ntype']
         if (net_type == 'CNet') and (self.activator is not None):
             raise AttributeError('The activator in output layer for classification neural network has to be None')
-        self.n_neurons = layers_configs['para'][0]['output_size']
+        self.n_neurons = layers_configs['params'][0]['output_size']
         self._construct(self.n_neurons, layers_configs, layers_results)
 
 
@@ -41,7 +41,7 @@ class FCLayer(Layer):
                                       w_initial, name,
                                       layer_type='fc')
         self.n_neurons = n_neurons
-        self._para['n_neurons'] = self.n_neurons
+        self._params['n_neurons'] = self.n_neurons
 
     def construct(self, layers_configs, layers_results):
         if layers_configs['type'][-1] == 'conv':

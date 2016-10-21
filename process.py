@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 
 def select_lane(path, lane=1):
@@ -28,7 +29,7 @@ def select_lane(path, lane=1):
                 dv = car_data_at_t.dv
                 data_to_be_append.set_value(i, v)
                 data_to_be_append.set_value(i+20, v_l)
-                data_to_be_append.set_value(i+40, dx)
+                data_to_be_append.set_value(i+40, dx)       # gap
                 data_to_be_append.set_value(i+60, dv)
 
         time_data = time_data.append(data_to_be_append, ignore_index=True)
@@ -46,7 +47,7 @@ def select_lane(path, lane=1):
 
     data = lane_data.loc[:, ['Vehicle_ID', 'filter_position']]
     all_ids = data['Vehicle_ID'].unique()
-    delta_xs = pd.Series(name='delta_x')
+    delta_xs = pd.Series(name='displacement')
     for car_id in all_ids:
         p_data = data['filter_position'][data['Vehicle_ID'] == car_id]
         delta_x = p_data.diff()
@@ -56,7 +57,47 @@ def select_lane(path, lane=1):
     # lane1_data.to_csv('datasets/s3.csv')
     lane_data.to_pickle(path[:17]+'_lane%s.pickle' % lane)
 
+
+def combine_gap_displacement_data(all_paths):
+    all_road_data = pd.read_pickle(all_paths[0]).iloc[:, :12]
+    for path in all_paths[1:]:
+        all_road_data = pd.concat((all_road_data, pd.read_pickle(path).iloc[:, :12]), axis=0)
+    print(all_road_data.shape)
+    all_road_data.rename(columns={'delta_x': 'displacement'}, inplace=True)
+    all_road_data.to_pickle('datasets/I80-0400-0415-filter_0.8_gap_displacement.pickle')
+
+
+def get_displacement(path):
+    all_road_data = pd.read_pickle(path)
+    all_car_id = np.unique(all_road_data['Vehicle_ID'])
+    all_road_data['displacement'] = ''
+    for i in all_car_id:
+        single_car = all_road_data[all_road_data['Vehicle_ID'] == i]
+        single_car_p = single_car['filter_position']
+        single_car_index = single_car.index
+        single_car_displacement = np.diff(single_car_p)
+        all_road_data.iloc[single_car_index[1:], -1] = single_car_displacement
+    all_road_data.to_pickle('datasets/I80-0500-0515-filter_0.8_T_v_ldxdvhdisplace.pickle')
+    all_road_data.iloc[:5000, :].to_csv('datasets/I80-0500-0515-filter_sample.csv')
+
+
+def get_proceeding_position(path):
+    road_data = pd.read_pickle(path)
+    road_data['proceeding_position'] = road_data['filter_position'] + road_data['dx']
+    road_data.to_pickle('datasets/I80-0500-0515-filter_0.8_T_v_ldxdvhdisplace_proposition.pickle')
+    road_data.iloc[:5000, :].to_csv('datasets/I80-0500-0515-filter_sample.csv')
+
+
+
 if __name__ == '__main__':
-    path = 'datasets/I80-0400-0415-filter_0.8_T_v_ldxdvh.pickle'
-    select_lane(path, lane=5)
+    # path = 'datasets/I80-0400-0415-filter_0.8_T_v_ldxdvh.pickle'
+    # select_lane(path, lane=5)
+    # combine_gap_displacement_data([
+    #     'datasets/I80-0400_lane1.pickle',
+    #     'datasets/I80-0400_lane2.pickle',
+    #     'datasets/I80-0400_lane3.pickle',
+    #     'datasets/I80-0400_lane4.pickle',
+    # ])
+    # get_displacement('datasets/I80-0500-0515-filter_0.8_T_v_ldxdvh.pickle')
+    get_proceeding_position('datasets/I80-0500-0515-filter_0.8_T_v_ldxdvhdisplace.pickle')
 

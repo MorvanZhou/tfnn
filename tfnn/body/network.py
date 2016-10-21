@@ -180,7 +180,7 @@ class Network(object):
                                 'ftrl',                or 'Ftrl',
                                 'rmsprop',             or 'RMSProp'
                                 ]''' % optimizer)
-        self.optimizer_para = [args, kwargs]
+        self.optimizer_params = [args, kwargs]
         if self.layers_configs['type'][-1] != 'output':
             raise NotImplementedError('Please add output layer.')
 
@@ -220,7 +220,7 @@ class Network(object):
         if not hasattr(self, '_init'):
             if not hasattr(self, 'lr'):
                 self.set_learning_rate(0.001)
-            self.optimizer = self._optimizer(self._lr,  *self.optimizer_para[0], **self.optimizer_para[1])
+            self.optimizer = self._optimizer(self._lr,  *self.optimizer_params[0], **self.optimizer_params[1])
             with tfnn.name_scope('trian'):
                 self._train_op = self.optimizer.minimize(self.loss, self.global_step, name='train_op')
             # initialize all variables

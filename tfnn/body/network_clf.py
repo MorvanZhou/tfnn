@@ -12,14 +12,14 @@ class ClfNetwork(Network):
             input_size, output_size, do_dropout, do_l2, ntype='CNet')
         self.method = method
         self.name = 'ClassificationNetwork'
-        self._para = {
+        self._params = {
             'input_size': input_size,
             'output_size': output_size,
             'method': method,
             'do_dropout': do_dropout,
             'do_l2': do_l2,
         }
-        self.layers_configs['para'] = [self._para]
+        self.layers_configs['params'] = [self._params]
 
     def __str__(self):
         return self.name
