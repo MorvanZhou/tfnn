@@ -13,9 +13,11 @@ class RNNDataSet(object):
         self._batch_time_index = 0
         for bl in basket_len:
             # feature panel, shape (sample_num, time_steps, input_size)
-            f_pn = pd.read_pickle('datasets/b{}_f.pickle'.format(bl)).as_matrix()
+            f_pn = pd.read_pickle(
+                'datasets/RNN_F(my_displacement+gap)T(my_gap)/b{}_f(dis+gap).pickle'.format(bl)).as_matrix()
             # target panel, shape (sample_num, time_steps, output_size)
-            t_pn = pd.read_pickle('datasets/b{}_t.pickle'.format(bl)).as_matrix()
+            t_pn = pd.read_pickle(
+                'datasets/RNN_F(my_displacement+gap)T(my_gap)/b{}_t(dis).pickle'.format(bl)).as_matrix()
             self.features[bl] = f_pn
             self.targets[bl] = t_pn
 
@@ -72,14 +74,12 @@ class DataSet(object):
     def __init__(self, path):
         # including [deri_v, delta_x, dx, dv, deri_a_clipped, v_l]
         df = pd.read_pickle(path)
-        df = df[(df['Lane_Identification'] >= 3) & (df['Lane_Identification'] <= 6)]
         self._road_data = df.loc[:,
                           ['Vehicle_ID', 'deri_v', 'displacement', 'dx', 'dv', 'deri_a_clipped', 'v_l']].dropna()
         self._car_ids = np.unique(self._road_data['Vehicle_ID'])
         self._id_index = 0
 
-    def put_in_basket(self):
-        basket_len = [40, 100, 300, 1000]
+    def put_in_basket(self, basket_len=[40, 100, 300, 1000]):
         b0 = [[], []]
         b1 = [[], []]
         b2 = [[], []]
@@ -113,85 +113,23 @@ class DataSet(object):
         # target = b0[1][0] (one sample) with shape of (basket_time_steps, )
         # features = b0[0] ==> shape (basket_time_steps, inputs, sample_num) ==> transpose to (sample_num, basket_time_steps, inputs)
         # targets = b0[1] ==> shape (outputs, basket_time_steps, sample_num) ==> transpose to (sample_num, basket_time_steps, outputs)
-        pd.Panel(np.dstack(b0[0]).transpose(2, 0, 1)).to_pickle('datasets/b1000_f.pickle')
-        pd.Panel(np.dstack(b0[1]).transpose(2, 1, 0)).to_pickle('datasets/b1000_t.pickle')
-        pd.Panel(np.dstack(b1[0]).transpose(2, 0, 1)).to_pickle('datasets/b300_f.pickle')
-        pd.Panel(np.dstack(b1[1]).transpose(2, 1, 0)).to_pickle('datasets/b300_t.pickle')
-        pd.Panel(np.dstack(b2[0]).transpose(2, 0, 1)).to_pickle('datasets/b100_f.pickle')
-        pd.Panel(np.dstack(b2[1]).transpose(2, 1, 0)).to_pickle('datasets/b100_t.pickle')
-        pd.Panel(np.dstack(b3[0]).transpose(2, 0, 1)).to_pickle('datasets/b40_f.pickle')
-        pd.Panel(np.dstack(b3[1]).transpose(2, 1, 0)).to_pickle('datasets/b40_t.pickle')
-
-    def _get_car_data(self):
-        if self._new_id_index != self._id_index:
-            self._id_index = self._new_id_index
-            car_id = self._car_ids[self._id_index]
-            self._car_data = self._road_data[self._road_data['Vehicle_ID'] == car_id]
-        return self._car_data
-
-    def next(self, batch_size, time_steps, predict='v'):
-        b_features, b_targets, b_is_zero_initial_state = self._get_one_sample(time_steps, predict)
-        if batch_size > 1:
-            for b in range(1, batch_size):
-                features, targets, is_zero_initial_state = self._get_one_sample(time_steps, predict)
-                b_features = np.append(b_features, features, 0)
-                b_targets = np.append(b_targets, targets, 0)
-                b_is_zero_initial_state = np.append(b_is_zero_initial_state, is_zero_initial_state, 0)
-        return [b_features, b_targets, b_is_zero_initial_state]
-
-    def _get_one_sample(self, time_steps, predict):
-        while True:
-            if not hasattr(self, '_new_id_index'):
-                self._new_id_index = 0
-            car_data = self._get_car_data()
-            if predict == 'a':
-                car_features = np.vstack((
-                    car_data['deri_a_clipped'] / 3, # self acceleration
-                    car_data['deri_v'] / 17 - 0.5,  # self speed
-                    car_data['dv'] / 10,            # relevant speed
-                    car_data['dx'] / 86 - 0.5,      # gap
-                )).T
-                car_targets = car_data['deri_a_clipped'].as_matrix()[:, np.newaxis]
-            elif predict == 'v':
-                car_features = np.vstack((
-                    # car_data['deri_a_clipped'] / 3,  # self acceleration
-                    # car_data['deri_v'] / 17 - 0.5,  # self speed
-                    # car_data['v_l'] / 17 - 0.5,     # preceding speed (reduce the dependency of self speed)
-                    # car_data['dv'] / 10,            # relevant speed
-                    car_data['dx'] / 86 - 0.5,      # gap
-                    car_data['displacement'] / 3.5 - 0.5,    # displacement
-                )).T
-                car_targets = car_data['deri_v'].as_matrix()[:, np.newaxis]
-            elif predict == 'displacement':
-                car_features = np.vstack((
-                    # car_data['deri_a_clipped'] / 3,  # self acceleration
-                    # car_data['deri_v'] / 17 - 0.5,  # self speed
-                    # car_data['v_l'] / 17 - 0.5,     # preceding speed (reduce the dependency of self speed)
-                    # car_data['dv'] / 10,            # relevant speed
-                    car_data['displacement'] / 3.5 - 0.5,  # displacement
-                    car_data['dx'] / 86 - 0.5,          # gap
-                )).T
-                car_targets = car_data['displacement'].as_matrix()[:, np.newaxis]
-            else:
-                raise ValueError
-            if not hasattr(self, '_start'):
-                self._start = 0
-            self._end = self._start + time_steps
-            if self._end < car_features.shape[0]:       # still in the same car
-                features = car_features[self._start: self._end, :][np.newaxis, :, :]    # 2_3D
-                targets = car_targets[self._start + 1: self._end + 1, :][np.newaxis, :, :]      # 2_3D
-                # targets = car_features[self._start + 1: self._end + 1, :][np.newaxis, :, :]     # 2_3D
-                if self._start == 0:
-                    is_zero_initial_state = np.array([True])
-                else:
-                    is_zero_initial_state = np.array([False])
-                self._start += time_steps
-                break
-            else:       # jump to a different car
-                self._new_id_index = np.random.randint(0, len(self._car_ids), 1)[0]
-                self._start = 0
-
-        return [features, targets, is_zero_initial_state]
+        base_dir = 'datasets/RNN_F(my_displacement+gap)T(my_gap)'
+        pd.Panel(np.dstack(b0[0]).transpose(2, 0, 1)).to_pickle(
+            '{0}/b{1}_f(dis+gap).pickle'.format(base_dir, basket_len[-1]))
+        pd.Panel(np.dstack(b0[1]).transpose(2, 1, 0)).to_pickle(
+            '{0}/b{1}_t(dis).pickle'.format(base_dir, basket_len[-1]))
+        pd.Panel(np.dstack(b1[0]).transpose(2, 0, 1)).to_pickle(
+            '{0}/b{1}_f(dis+gap).pickle'.format(base_dir, basket_len[-2]))
+        pd.Panel(np.dstack(b1[1]).transpose(2, 1, 0)).to_pickle(
+            '{0}/b{1}_t(dis).pickle'.format(base_dir, basket_len[-2]))
+        pd.Panel(np.dstack(b2[0]).transpose(2, 0, 1)).to_pickle(
+            '{0}/b{1}_f(dis+gap).pickle'.format(base_dir, basket_len[-3]))
+        pd.Panel(np.dstack(b2[1]).transpose(2, 1, 0)).to_pickle(
+            '{0}/b{1}_t(dis).pickle'.format(base_dir, basket_len[-3]))
+        pd.Panel(np.dstack(b3[0]).transpose(2, 0, 1)).to_pickle(
+            '{0}/b{1}_f(dis+gap).pickle'.format(base_dir, basket_len[-4]))
+        pd.Panel(np.dstack(b3[1]).transpose(2, 1, 0)).to_pickle(
+            '{0}/b{1}_t(dis).pickle'.format(base_dir, basket_len[-4]))
 
 
 class Plotter(object):
@@ -416,9 +354,9 @@ class RNN(object):
         return pred[0, 0]
 
 
-def test(model, test_config, id, predict, on_test=True ):
+def test(model, test_config, id):
     plt.ion()
-    model.restore(test_config.restore_path + '_' + predict)
+    model.restore(test_config.restore_path + '_' + test_config.predict)
     ps, vs, accs, dispms = test_config.data
 
     test_ps = ps.copy()
@@ -427,11 +365,14 @@ def test(model, test_config, id, predict, on_test=True ):
     test_dispms = dispms.copy()
 
     for i in range(1, test_config.sim_car_num):
-        end_f_id = test_ps.iloc[:, i - 1].dropna().index[-1]    # for preceding vehicle
+        end_f_id = ps.iloc[:, i - 1].dropna().index[-1]    # for preceding vehicle
         is_initial_state = True
         init_counter = 0
-        for t in test_ps.iloc[:, i].dropna().index:     # for current vehicle
+        for t in ps.iloc[:, i].dropna().index:     # for current vehicle
             if t == end_f_id:
+                # filter out the original value
+                test_ps.loc[t + 1:, i] = None
+                test_vs.loc[t + 1:, i] = None
                 break
             # index from test data
             """if use the real ps and vs in here, the predicted acceleration is very close,
@@ -439,85 +380,37 @@ def test(model, test_config, id, predict, on_test=True ):
             If use test_ps, and test_vs, which will depend on the data generated by last time (from prediction).
             the acceleration error will be greater then last method (using real data directly),
             but the position error will be less than last method."""
-            if on_test:
+            if test_config.on_test:
                 # depend on test
                 p_data = test_ps.loc[t, i]
-                v_data = test_vs.loc[t, i]
-                # a_data = test_accs.loc[t, i]
                 dispms_data = test_dispms.loc[t, i]
             else:
                 # depend on real
                 p_data = ps.loc[t, i]
-                v_data = vs.loc[t, i]
-                # a_data = accs.loc[t, i]
                 dispms_data = dispms.loc[t, i]
-            # keep index from real data for leader
             pl_data = ps.loc[t, i - 1]
-            # vl_data = vs.loc[t, i - 1]
             dx_data = pl_data - p_data
-            # dv_data = vl_data - v_data
-            # speed, leader_speed, dx, dv
-            # [furthest, nearest]
-            if predict == 'a':
-                # speed, relevant_speed, dx
-                # [furthest, nearest]
-                input_data = np.asarray(
-                    [
-                        # a_data / 3,  # self acceleration
-                        v_data / 17 - 0.5,      # self speed,
-                        dv_data / 10,           # relevant speed
-                        dx_data / 86 - 0.5,     # gap
-                    ])[np.newaxis, np.newaxis, :]
-                new_a = model.predict(input_data, is_initial_state)
-                is_initial_state = False
-                speed_t2 = test_vs.loc[t, i] + new_a * 0.2
-                speed_t2 = 0 if speed_t2 < 0 else speed_t2
 
-                test_accs.loc[t + 1, i] = new_a
-                test_vs.loc[t + 2, i] = speed_t2
-                test_ps.loc[t + 3, i] = test_ps.loc[t + 1, i] + speed_t2 * 0.2
-            elif predict == 'v':
-                # leader_speed, dx, dv
-                # [furthest, nearest]
+            if test_config.predict == 'displacement':
                 input_data = np.asarray([
-                    # a_data / 3,  # self acceleration
-                    v_data / 17 - 0.5,      # self speed
-                    # vl_data / 17 - 0.5,  # preceding speed (reduce the dependency of self speed)
-                    dv_data / 10,  # relevant speed
-                    dx_data / 86 - 0.5,  # gap
-                ])[np.newaxis, np.newaxis, :]
-
-                new_speed = model.predict(input_data, is_initial_state)
-                is_initial_state = False
-                if init_counter < 20:
-                    init_counter += 1
-                    continue
-                new_speed = 0 if new_speed < 0 else new_speed
-                test_vs.loc[t + 1, i] = new_speed  # next speed
-                test_ps.loc[t + 1, i] = \
-                    test_ps.loc[t, i] + (test_vs.loc[t, i] + new_speed) * 0.1 / 2   # next position = X1 + (V2+V1)*t/2
-                test_accs.loc[t + 1, i] = \
-                    (new_speed - test_vs.loc[t - 1, i]) / 0.1      # new acceleration = (V2-V1)/t
-            elif predict == 'displacement':
-                # leader_speed, dx, dv
-                # [furthest, nearest]
-                input_data = np.asarray([
-                    # a_data / 3,  # self acceleration
-                    # v_data / 17 - 0.5,  # self speed
-                    # vl_data / 17 - 0.5,  # preceding speed (reduce the dependency of self speed)
-                    # dv_data / 10,  # relevant speed
                     dispms_data * test_config.displacement_scale + test_config.displacement_bias,  # displacement
                     dx_data * test_config.gap_scale + test_config.gap_bias,  # gap
                 ])[np.newaxis, np.newaxis, :]
 
                 new_displacement = model.predict(input_data, is_initial_state)
-                is_initial_state = False
-                if init_counter < 20:
-                    init_counter += 1
-                    continue
-                new_displacement = 0 if new_displacement < 0 else new_displacement
-                test_ps.loc[t+1, i] = test_ps.loc[t, i] + new_displacement
-                test_dispms.loc[t+1, i] = new_displacement
+                if new_displacement >= 0:
+                    # start to have proceeding condition
+                    new_displacement = 0 if new_displacement < 0 else new_displacement
+                    test_ps.loc[t + 1, i] = test_ps.loc[t, i] + new_displacement
+                    test_dispms.loc[t + 1, i] = new_displacement
+                    if is_initial_state:
+                        # filter out the original value
+                        test_ps.loc[:t, i] = None
+                        test_vs.loc[:t, i] = None
+                    is_initial_state = False
+
+            else:
+                raise ValueError('not support')
 
     plt.figure(0)
     plt.title('Position')
@@ -546,8 +439,7 @@ def test(model, test_config, id, predict, on_test=True ):
     plt.show()
 
 
-def train(train_config, predict, test_config):
-    # data = DataSet(train_config.data_path)   # un batched data
+def train(train_config, test_config):
     # plotter = Plotter(train_config.time_steps, train_config.predict)
     data = RNNDataSet()
     data.normalize(train_config)        # normalization
@@ -570,8 +462,8 @@ def train(train_config, predict, test_config):
         if i % train_config.plot_loop == 0:
             # plotter.update()
             print('step:', i, 'cost: ', cost_, 'lr: ', lr_)
-            print("Save to path: ", train_rnn.save('tmp/rnn_{}'.format(predict)))
-            test(test_rnn, test_config, 890, predict, on_test=test_config.on_test)
+            print("Save to path: ", train_rnn.save('tmp/rnn_{}'.format(train_config.predict)))
+            test(test_rnn, test_config, 890)
             plt.pause(0.001)
             print('done plot')
         # plotter.plt_time += train_config.time_steps
@@ -588,6 +480,7 @@ class TrainConfig(object):
     # data_path = 'datasets/I80-0400_lane2.pickle'
     iter_steps = 100001
     plot_loop = 5000
+    basket_len = [40, 100, 300, 1000]
     predict = 'displacement'
     batch_size = 50
     time_steps = 5
@@ -624,7 +517,7 @@ class TestConfig(object):
     weighted_cost = True
     on_test = True
     restore_path = 'tmp/rnn'
-    sim_car_num = 5
+    sim_car_num = 9
     start_car_id = 890
 
     def __init__(self):
@@ -663,15 +556,24 @@ def set_seed(seed):
     np.random.seed(seed)
 
 if __name__ == '__main__':
+    """
+        For this model
+        Input: my displacement, gap;
+        Output: my next displacement.
+    """
     # set_seed(1)
 
     train_config = TrainConfig()
     test_config = TestConfig()
-    data = DataSet(train_config.data_path)
-    # data.put_in_basket()
+
+    ###################################
+    # re-organize RNN data
+    # data = DataSet('datasets/I80-0500-0515-filter_0.8_T_v_ldxdvhdisplace_proposition&displacement.pickle')   # un batched data
+    # data.put_in_basket(basket_len=train_config.basket_len)
+    ###################################
 
     # TODO: set the output as next input sep2sep model: https://github.com/tensorflow/tensorflow/blob/master/tensorflow/models/rnn/translate/seq2seq_model.py
     # https://www.tensorflow.org/versions/r0.11/tutorials/seq2seq/index.html
-    train(train_config, train_config.predict, test_config)
+    train(train_config, test_config)
 
     # test(test_config, id=890, on_test=True, predict=train_config.predict)

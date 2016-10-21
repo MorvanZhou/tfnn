@@ -14,10 +14,12 @@ class RNNDataSet(object):
         for bl in basket_len:
             # feature panel, shape (sample_num, time_steps, input_size)
             # proceeding displacement is the only input
-            f_pn = pd.read_pickle('datasets/b{}_f(dis_l).pickle'.format(bl)).as_matrix()
+            f_pn = pd.read_pickle(
+                'datasets/RNN_F(proceeding_displacement)T(partial_gap)/b{}_f(dis_l).pickle'.format(bl)).as_matrix()
             # target panel, shape (sample_num, time_steps, output_size)
             # gap is the only output
-            t_pn = pd.read_pickle('datasets/b{}_t(gap).pickle'.format(bl)).as_matrix()
+            t_pn = pd.read_pickle(
+                'datasets/RNN_F(proceeding_displacement)T(partial_gap)/b{}_t(partial_gap).pickle'.format(bl)).as_matrix()
             self.features[bl] = f_pn
             self.targets[bl] = t_pn
 
@@ -61,15 +63,13 @@ class DataSet(object):
     def __init__(self, path):
         # including [deri_v, delta_x, dx, dv, deri_a_clipped, v_l]
         df = pd.read_pickle(path)
-        df = df[(df['Lane_Identification'] >= 3) & (df['Lane_Identification'] <= 6)]
         self._road_data = df.loc[:,
                           ['Vehicle_ID', 'deri_v', 'displacement', 'dx', 'dv', 'deri_a_clipped',
                            'proceeding_displacement', 'v_l']].dropna()
         self._car_ids = np.unique(self._road_data['Vehicle_ID'])
         self._id_index = 0
 
-    def put_in_basket(self):
-        basket_len = [40, 100, 300, 1000]
+    def put_in_basket(self, basket_len=[40, 100, 300, 1000]):
         b0 = [[], []]
         b1 = [[], []]
         b2 = [[], []]
@@ -77,8 +77,10 @@ class DataSet(object):
         for car_id in self._car_ids:
             # input is only the proceeding displacement
             features = self._road_data[self._road_data['Vehicle_ID'] == car_id]['proceeding_displacement'].copy()
-            # output is only the gap
-            targets = self._road_data[self._road_data['Vehicle_ID'] == car_id]['dx'].copy()
+            # output is only the partial gap
+            gaps = self._road_data[self._road_data['Vehicle_ID'] == car_id]['dx'].copy()
+            # for next time step
+            targets = (gaps - features).iloc[1:].copy()
             targets_steps = targets.shape[0]
             start_pointer = 0
             # filter the data that have time step > 1000
@@ -105,14 +107,23 @@ class DataSet(object):
         # target = b0[1][0] (one sample) with shape of (basket_time_steps, )
         # features = b0[0] ==> shape (inputs, basket_time_steps, sample_num) ==> transpose to (sample_num, basket_time_steps, inputs)
         # targets = b0[1] ==> shape (outputs, basket_time_steps, sample_num) ==> transpose to (sample_num, basket_time_steps, outputs)
-        pd.Panel(np.dstack(b0[0]).transpose(2, 1, 0)).to_pickle('datasets/b1000_f(dis_l).pickle')
-        pd.Panel(np.dstack(b0[1]).transpose(2, 1, 0)).to_pickle('datasets/b1000_t(gap).pickle')
-        pd.Panel(np.dstack(b1[0]).transpose(2, 1, 0)).to_pickle('datasets/b300_f(dis_l).pickle')
-        pd.Panel(np.dstack(b1[1]).transpose(2, 1, 0)).to_pickle('datasets/b300_t(gap).pickle')
-        pd.Panel(np.dstack(b2[0]).transpose(2, 1, 0)).to_pickle('datasets/b100_f(dis_l).pickle')
-        pd.Panel(np.dstack(b2[1]).transpose(2, 1, 0)).to_pickle('datasets/b100_t(gap).pickle')
-        pd.Panel(np.dstack(b3[0]).transpose(2, 1, 0)).to_pickle('datasets/b40_f(dis_l).pickle')
-        pd.Panel(np.dstack(b3[1]).transpose(2, 1, 0)).to_pickle('datasets/b40_t(gap).pickle')
+        base_dir = 'datasets/RNN_F(proceeding_displacement)T(partial_gap)'
+        pd.Panel(np.dstack(b0[0]).transpose(2, 1, 0)).to_pickle(
+            '{0}/b{1}_f(dis_l).pickle'.format(base_dir, basket_len[-1]))
+        pd.Panel(np.dstack(b0[1]).transpose(2, 1, 0)).to_pickle(
+            '{0}/b{1}_t(partial_gap).pickle'.format(base_dir,basket_len[-1]))
+        pd.Panel(np.dstack(b1[0]).transpose(2, 1, 0)).to_pickle(
+            '{0}/b{1}_f(dis_l).pickle'.format(base_dir,basket_len[-2]))
+        pd.Panel(np.dstack(b1[1]).transpose(2, 1, 0)).to_pickle(
+            '{0}/b{1}_t(partial_gap).pickle'.format(base_dir,basket_len[-2]))
+        pd.Panel(np.dstack(b2[0]).transpose(2, 1, 0)).to_pickle(
+            '{0}/b{1}_f(dis_l).pickle'.format(base_dir,basket_len[-3]))
+        pd.Panel(np.dstack(b2[1]).transpose(2, 1, 0)).to_pickle(
+            '{0}/b{1}_t(partial_gap).pickle'.format(base_dir,basket_len[-3]))
+        pd.Panel(np.dstack(b3[0]).transpose(2, 1, 0)).to_pickle(
+            '{0}/b{1}_f(dis_l).pickle'.format(base_dir,basket_len[-4]))
+        pd.Panel(np.dstack(b3[1]).transpose(2, 1, 0)).to_pickle(
+            '{0}/b{1}_t(partial_gap).pickle'.format(base_dir,basket_len[-4]))
 
 
 class Plotter(object):
@@ -327,7 +338,7 @@ class RNN(object):
         return pred[0, 0]
 
 
-def test(model, test_config, predict):
+def test(model, test_config):
     """
     Use proceeding displacement_0 to predict next gap without proceeding displacement_1
     (or the real gap - proceeding displacement). In other word,
@@ -335,38 +346,40 @@ def test(model, test_config, predict):
     using last real gap - this gap without movement of proceeding car.
     """
     plt.ion()
-    model.restore(test_config.restore_path + '_' + predict)
-    ps, vs, accs, gaps, proceeding_dispms = test_config.data
+    model.restore(test_config.restore_path + '_' + test_config.predict)
+    ps, vs= test_config.data
 
     test_ps = ps.copy()
     test_vs = vs.copy()
-    test_accs = accs.copy()
-    test_proceeding_dispms = proceeding_dispms.copy()
 
     for i in range(1, test_config.sim_car_num):
-        end_f_id = test_ps.iloc[:, i - 1].dropna().index[-1]    # for preceding vehicle
+        end_f_id = ps.iloc[:, i - 1].dropna().index[-1]    # for preceding vehicle
         is_initial_state = True
-        initial_counter = 0
-        for t in test_ps.iloc[:, i].dropna().index:     # for current vehicle
+        for t in ps.iloc[:, i].dropna().index:     # for current vehicle
             if t == end_f_id:
+                # filter out the original value
+                test_ps.loc[t+1:, i] = None
+                test_vs.loc[t+1:, i] = None
                 break
-            # keep index from real data for leader
-            proceeding_dispms_data = test_proceeding_dispms.loc[t, i]
-            # [furthest, nearest]
-            if predict == 'gap':
-                # leader_speed, dx, dv
-                # [furthest, nearest]
+            proceeding_dispms_data = ps.loc[t, i-1] - ps.loc[t-1, i-1]
+            if test_config.predict == 'partial_gap':
                 input_data = np.asarray([
                     proceeding_dispms_data,  # proceeding_displacement
                 ])[np.newaxis, np.newaxis, :]
 
-                new_gap = model.predict(input_data, is_initial_state)
-                is_initial_state = False
-                test_ps.loc[t+1, i] = ps.loc[t+1, i-1] - new_gap
-                if initial_counter < 5:
-                    initial_counter += 1
-                else:
-                    test_vs.loc[t+1, i] = (test_ps.loc[t+1, i] - test_ps.loc[t, i])/0.1
+                new_partial_gap = model.predict(input_data, is_initial_state)
+                if new_partial_gap >= 0:
+                    # start to have proceeding condition
+                    new_gap = new_partial_gap + (ps.loc[t + 1, i - 1] - ps.loc[t, i - 1])  # the total gap
+                    test_ps.loc[t + 1, i] = ps.loc[t + 1, i - 1] - new_gap  # assign the predicted value to test set
+                    test_vs.loc[t + 1, i] = (test_ps.loc[t + 1, i] - test_ps.loc[t, i]) / 0.1
+                    if is_initial_state:
+                        # filter out the original value
+                        test_ps.loc[:t, i] = None
+                        test_vs.loc[:t, i] = None
+                    is_initial_state = False
+            else:
+                raise ValueError('not support')
 
     plt.figure(0)
     plt.title('Position')
@@ -395,11 +408,9 @@ def test(model, test_config, predict):
     plt.show()
 
 
-def train(train_config, predict, test_config):
-    # data = DataSet(train_config.data_path)   # un batched data
-    # data.put_in_basket()
+def train(train_config, test_config):
     # plotter = Plotter(train_config.time_steps, train_config.predict)
-    data = RNNDataSet()
+    data = RNNDataSet(train_config.basket_len)
     train_rnn = RNN(train_config)
     test_rnn = RNN(test_config)
     for i in range(train_config.iter_steps):
@@ -416,8 +427,8 @@ def train(train_config, predict, test_config):
         if i % train_config.plot_loop == 0:
             # plotter.update()
             print('step:', i, 'cost: ', cost_, 'lr: ', lr_)
-            print("Save to path: ", train_rnn.save('tmp/rnn_{}'.format(predict)))
-            test(test_rnn, test_config, predict)
+            print("Save to path: ", train_rnn.save('tmp/rnn_{}'.format(train_config.predict)))
+            test(test_rnn, test_config)
             plt.pause(0.001)
             print('done plot')
         # plotter.plt_time += train_config.time_steps
@@ -435,9 +446,10 @@ class TrainConfig(object):
     # data_path = 'datasets/I80-0400_lane2.pickle'
     iter_steps = 100001
     plot_loop = 2000
-    predict = 'gap'
+    basket_len = [20, 100, 300, 1000]
+    predict = 'partial_gap'
     batch_size = 50
-    time_steps = 1
+    time_steps = 10
     input_size = 1
     output_size = 1
     cell_layers = 1
@@ -452,7 +464,7 @@ class TrainConfig(object):
 
 class TestConfig(object):
     data_path = 'datasets/I80-0400_lane2_proceeding_position&displacement.pickle'
-    predict = 'displacement'
+    predict = 'partial_gap'
     batch_size = 1
     time_steps = 1
     input_size = 1
@@ -477,31 +489,20 @@ class TestConfig(object):
         ids = np.unique(df.Vehicle_ID)
         filter_ids = ids[ids >= self.start_car_id]
         ps = pd.DataFrame()
-        gaps = pd.DataFrame()
         vs = pd.DataFrame()
-        accs = pd.DataFrame()
         # dispms = pd.DataFrame()
-        proceeding_dispms = pd.DataFrame()
         for i, car_id in enumerate(filter_ids):
             if i >= self.sim_car_num:
                 break
             car_data = df[df['Vehicle_ID'] == car_id]
             car_data = car_data.set_index(['Frame_ID'])
             car_position = car_data['filter_position']
-            car_gap = car_data['dx']
             car_speed = car_data['deri_v']
-            car_acc = car_data['deri_a_clipped']
-            # car_dispms = car_data['displacement']
-            car_proceeding_dispms = car_data['proceeding_displacement']
             # shape (time, n_car) for positions
             ps = pd.concat([ps, car_position.rename(i)], axis=1)
-            gaps = pd.concat([gaps, car_gap.rename(i)], axis=1)
             # shape (time, n_car) for speeds
             vs = pd.concat([vs, car_speed.rename(i)], axis=1)
-            accs = pd.concat([accs, car_acc.rename(i)], axis=1)
-            # dispms = pd.concat([dispms, car_dispms.rename(i)], axis=1)
-            proceeding_dispms = pd.concat([proceeding_dispms, car_proceeding_dispms.rename(i)], axis=1)
-        return [ps, vs, accs, gaps, proceeding_dispms]
+        return [ps, vs]
 
 
 def set_seed(seed):
@@ -509,13 +510,20 @@ def set_seed(seed):
     np.random.seed(seed)
 
 if __name__ == '__main__':
+    """
+    For this model
+    Input: leader displacement;
+    Output: next gap
+    """
     # set_seed(1)
 
     train_config = TrainConfig()
     test_config = TestConfig()
 
-    # TODO: set the output as next input sep2sep model: https://github.com/tensorflow/tensorflow/blob/master/tensorflow/models/rnn/translate/seq2seq_model.py
-    # https://www.tensorflow.org/versions/r0.11/tutorials/seq2seq/index.html
-    train(train_config, train_config.predict, test_config)
+    ###################################
+    # re-organize RNN data
+    # data = DataSet('datasets/I80-0500-0515-filter_0.8_T_v_ldxdvhdisplace_proposition&displacement.pickle')   # un batched data
+    # data.put_in_basket(basket_len=train_config.basket_len)
+    ###################################
 
-    # test(test_config, id=890, on_test=True, predict=train_config.predict)
+    train(train_config, test_config)

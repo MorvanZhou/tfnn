@@ -88,12 +88,15 @@ def test_(test_config, id, predict, model=None):
     ps, vs, accs, proceeding_dispms = test_config.data
     test_ps = ps.copy()
     test_vs = vs.copy()
-    test_accs = accs.copy()
 
     for i in range(1, test_config.sim_car_num):
-        end_f_id = test_ps.iloc[:, i - 1].dropna().index[-test_config.time_steps]  # for preceding vehicle
-        for t in test_ps.iloc[:, i].dropna().index:  # for current vehicle
+        end_f_id = ps.iloc[:, i - 1].dropna().index[-test_config.time_steps]  # for preceding vehicle
+        has_been_dropped = False
+        for t in ps.iloc[:, i].dropna().index:  # for current vehicle
             if t == end_f_id:
+                # filter out the original value
+                test_ps.loc[t + 1:, i] = None
+                test_vs.loc[t + 1:, i] = None
                 break
             proceeding_dispms_data = proceeding_dispms.loc[t: t + test_config.time_steps - 1, i]
 
@@ -101,6 +104,12 @@ def test_(test_config, id, predict, model=None):
                 input_data = proceeding_dispms_data * test_config.displacement_scale + test_config.displacement_bias,  # displacement
                 new_gap = model.predict(input_data)
                 test_ps.loc[t + test_config.time_steps, i] = ps.loc[t+test_config.time_steps, i-1] - new_gap
+                if not has_been_dropped:
+                    test_ps.loc[:t + test_config.time_steps-1, i] = None
+                    test_vs.loc[:t + test_config.time_steps-1, i] = None
+                    has_been_dropped = True
+            else:
+                raise ValueError('not support')
 
     plt.figure(0)
     if not none_model:
@@ -136,7 +145,7 @@ class TrainConfig(object):
     hidden_layers = [50]
     is_training = True
     keep_prob = 1
-    learning_rate = 4e-4
+    learning_rate = 1e-3
     decay_steps = 2000
     decay_rate = 1
 
@@ -187,6 +196,11 @@ class TestConfig(object):
         return [ps, vs, accs, proceeding_dispms]
 
 if __name__ == '__main__':
+    """
+        For this model
+        Input: leader displacement;
+        Output: gap.
+    """
     # set_seed(1)
 
     ITER_STEPS = 80001
