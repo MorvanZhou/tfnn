@@ -1,1 +1,20 @@
 .idea
+datasets
+road data
+tmp
+ColorLine
+filter
+plot_trajectory.py
+process.py
+RNN_PTB.py
+road_data_organize.py
+road_test(NN).py
+road_test(NN_F(my_displace_gap)T(my_displace)).py
+road_test(NN_F(proceeding_displace)T(gap)).py
+road_test(RNN_on_real_F(my_displace+gap)T(my_displace)).py
+road_test(RNN_on_real_F(proceeding_displacement)T(partial_gap)).py
+road_test(RNN_on_real_F(proceeding_displacement+last_gap)T(partial_gap)).py
+test_dynamic_RNN.py
+test_RNN.py
+test_RNN_reg.py
+test_tensorflow.py
