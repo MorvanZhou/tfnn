@@ -1,4 +1,5 @@
 import numpy as np
+import time
 import tfnn
 from tfnn.body.layer import Layer
 from tfnn.preprocessing.normalizer import Normalizer
@@ -193,11 +194,46 @@ class Network(object):
         _feed_dict = self._get_feed_dict(feed_xs, feed_ys, *args, **kwargs)
         self.sess.run(self._train_op, feed_dict=_feed_dict)
 
-    def fit(self, feed_xs, feed_ys, steps=2000, *args, **kwargs):
+    def fit(self, feed_xs, feed_ys, steps=None, *args, **kwargs):
+        def _print_log(log):
+            print('\r{}'.format(log), end='')
+
+        def _get_progress(t_cost, step, steps):
+            _time_remaining_second = int(t_cost * (steps - step) / step)
+            if _time_remaining_second > 60:
+                _time_remaining_min = _time_remaining_second // 60
+                _time_remaining_second %= 60
+                if _time_remaining_min > 60:
+                    _time_remaining_hour = _time_remaining_min // 60
+                    _time_remaining_min %= 60
+                    _time_remaining = str(_time_remaining_hour) + 'h-' \
+                                      + str(_time_remaining_min) + 'm-' \
+                                      + str(_time_remaining_second) + 's'
+                else:
+                    _time_remaining = str(_time_remaining_min) + 'm-' \
+                                      + str(_time_remaining_second) + 's'
+            else:
+                _time_remaining = str(_time_remaining_second) + 's'
+
+            _percentage = str(round(step / steps * 100, 2)) + '%'
+            return [_time_remaining, _percentage]
+
         train_data = tfnn.Data(feed_xs, feed_ys)
-        for _ in range(steps):
-            b_xs, b_ys = train_data.next_batch(100)
+        if steps is None:
+            steps = train_data.n_samples
+        time_start = time.time()
+        for step in range(1, steps+1):
+            b_xs, b_ys = train_data.next_batch(50)
             self.run_step(feed_xs=b_xs, feed_ys=b_ys, *args, **kwargs)
+            if step % 200 == 0:
+                time_cost = time.time() - time_start
+                time_remaining, percentage = _get_progress(time_cost, step, steps)
+                feed_dict = self._get_feed_dict(b_xs, b_ys, keep_prob=1., l2_value=0.)
+                cost = self.sess.run(self.loss, feed_dict=feed_dict)
+                _log = percentage + ' | ETA: ' + str(time_remaining) + ' | Cost: ' + \
+                       str(round(cost, 5))
+                _print_log(_log)
+        print('\r')
 
     def predict(self, *args, **kwargs):
         raise NotImplementedError("Abstract method")
@@ -350,8 +386,3 @@ class Network(object):
             _bshape = self.layers_results['Layer'][1:][n_layer].b.get_shape()
         return _bshape
 
-    @property
-    def error(self, xs, ys):
-        _feed_dict = self._get_feed_dict(xs, ys, keep_prob=1., l2_value=0.)
-        _error_value = self.sess.run(self.loss, feed_dict=_feed_dict)
-        return _error_value
