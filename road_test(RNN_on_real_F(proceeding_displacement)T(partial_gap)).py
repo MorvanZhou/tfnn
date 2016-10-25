@@ -203,67 +203,58 @@ class RNN(object):
             self._ys = tf.placeholder(tf.float32, [self._batch_size, self._time_steps, self._output_size], name='ys')
             if self._is_training:
                 self._global_step = tf.placeholder(tf.int32, [], name='global_step')
+        with tf.name_scope('RNN'):
+            with tf.variable_scope('input_layer'):
+                l_in_x = tf.reshape(self.xs, [-1, self._input_size], name='2_2D')  # (batch*n_step, in_size)
+                # Ws (in_size, cell_size)
+                Wi = self._weight_variable([self._input_size, self._cell_size])
+                # bs (cell_size, )
+                bi = self._bias_variable([self._cell_size, ])
+                # l_in_y = (batch * n_steps, cell_size)
+                with tf.name_scope('Wx_plus_b'):
+                    l_in_y = tf.matmul(l_in_x, Wi) + bi
+                # with tf.name_scope('activation'):
+                #     l_in_y = tf.nn.relu(l_in_y)
+                # reshape l_in_y ==> (batch, n_steps, cell_size)
+                l_in_y = tf.reshape(l_in_y, [-1, self._time_steps, self._cell_size], name='2_3D')
 
-        with tf.variable_scope('input_layer'):
-            l_in_x = tf.reshape(self.xs, [-1, self._input_size], name='2_2D')  # (batch*n_step, in_size)
-            # Ws (in_size, cell_size)
-            Wi = self._weight_variable([self._input_size, self._cell_size])
-            # bs (cell_size, )
-            bi = self._bias_variable([self._cell_size, ])
-            # l_in_y = (batch * n_steps, cell_size)
-            with tf.name_scope('Wx_plus_b'):
-                l_in_y = tf.matmul(l_in_x, Wi) + bi
-            # with tf.name_scope('activation'):
-            #     l_in_y = tf.nn.relu(l_in_y)
-            # reshape l_in_y ==> (batch, n_steps, cell_size)
-            l_in_y = tf.reshape(l_in_y, [-1, self._time_steps, self._cell_size], name='2_3D')
+            with tf.variable_scope('lstm_cell'):
+                # cell = tf.nn.rnn_cell.BasicLSTMCell(self._cell_size, forget_bias=1.0, state_is_tuple=True)
+                cell = tf.nn.rnn_cell.BasicRNNCell(self._cell_size)
+                if self._cell_layers > 1:
+                    cell = tf.nn.rnn_cell.MultiRNNCell([cell] * self._cell_layers, state_is_tuple=True)
+                if self._is_training and self._keep_prob < 1:
+                    cell = tf.nn.rnn_cell.DropoutWrapper(
+                        cell,
+                        input_keep_prob=1.,
+                        output_keep_prob=self._keep_prob)
+                with tf.name_scope('initial_state'):
+                    self._cell_initial_state = cell.zero_state(self._batch_size, dtype=tf.float32)
 
-        with tf.variable_scope('lstm_cell'):
-            # cell = tf.nn.rnn_cell.BasicLSTMCell(self._cell_size, forget_bias=1.0, state_is_tuple=True)
-            cell = tf.nn.rnn_cell.BasicRNNCell(self._cell_size)
-            if self._cell_layers > 1:
-                cell = tf.nn.rnn_cell.MultiRNNCell([cell] * self._cell_layers, state_is_tuple=True)
-            if self._is_training and self._keep_prob < 1:
-                cell = tf.nn.rnn_cell.DropoutWrapper(
-                    cell,
-                    input_keep_prob=1.,
-                    output_keep_prob=self._keep_prob)
-            with tf.name_scope('initial_state'):
-                self._cell_initial_state = cell.zero_state(self._batch_size, dtype=tf.float32)
+                self.cell_outputs = []
+                cell_state = self._cell_initial_state
+                for t in range(self._time_steps):
+                    if t > 0: tf.get_variable_scope().reuse_variables()
+                    cell_output, cell_state = cell(l_in_y[:, t, :], cell_state)
+                    self.cell_outputs.append(cell_output)
+                self._cell_final_state = cell_state
 
-            self.cell_outputs = []
-            for t in range(self._time_steps):
-                if not hasattr(self, 'cell_state'):
-                    self.cell_output, self.cell_state = cell(l_in_y[:, t, :], self._cell_initial_state)
-                else:
-                    tf.get_variable_scope().reuse_variables()
-                    self.cell_output, self.cell_state = cell(l_in_y[:, t, :], self.cell_state)
-                self.cell_outputs.append(self.cell_output)
-            self._cell_final_state = self.cell_state
-
-        with tf.variable_scope('output_layer'):
-            # cell_outputs_reshaped (BATCH*TIME_STEP, CELL_SIZE)
-            cell_outputs_reshaped = tf.reshape(tf.concat(1, self.cell_outputs), [-1, self._cell_size])
-            Wo = self._weight_variable((self._cell_size, self._output_size))
-            bo = self._bias_variable((self._output_size,))
-            product = tf.matmul(cell_outputs_reshaped, Wo) + bo
-            # _pred shape (batch*time_step, output_size)
-            self._pred = tf.nn.relu(product)    # for displacement
+            with tf.variable_scope('output_layer'):
+                # cell_outputs_reshaped (BATCH*TIME_STEP, CELL_SIZE)
+                cell_outputs_reshaped = tf.reshape(tf.concat(1, self.cell_outputs), [-1, self._cell_size])
+                Wo = self._weight_variable((self._cell_size, self._output_size))
+                bo = self._bias_variable((self._output_size,))
+                product = tf.matmul(cell_outputs_reshaped, Wo) + bo
+                # _pred shape (batch*time_step, output_size)
+                self._pred = tf.nn.relu(product)    # for displacement
 
         with tf.name_scope('cost'):
-            loss_weights = tf.ones([self._batch_size*self._time_steps*self._output_size])
-            # compute cost for the cell_outputs
-            loss = tf.nn.seq2seq.sequence_loss(
-                [tf.reshape(self._pred, [-1], name='reshape_pred')],
-                [tf.reshape(self.ys, [-1], name='reshape_target')],
-                [loss_weights],
-                average_across_timesteps=True,
-                average_across_batch=True,
-                softmax_loss_function=self.ms_error,
-                name='loss'
-            )
-            self._cost = loss
-                # tf.div(tf.reduce_sum(losses, name='losses_sum'), self._batch_size, name='average_cost')
+            _pred = tf.reshape(self._pred, [self._batch_size, self._time_steps, self._output_size])
+            mse = self.ms_error(_pred, self._ys)
+            mse_ave_across_batch = tf.reduce_mean(mse, 0)
+            mse_sum_across_time = tf.reduce_sum(mse_ave_across_batch, 0)
+            # mse_sum_across_outputs = tf.reduce_sum(mse_sum_across_time, 0)
+            self._cost = mse_sum_across_time
 
         if self._is_training:
             with tf.name_scope('trian'):
@@ -337,8 +328,69 @@ class RNN(object):
         pred, self.state_ = self.run([self._pred, self._cell_final_state], feed_dict=feed_dict)
         return pred[0, 0]
 
+def test_on_frame_id(model, test_config):
+    plt.ion()
+    model.restore(test_config.restore_path + '_' + test_config.predict)
+    ps, vs, pps = test_config.data
 
-def test(model, test_config):
+    test_ps = ps.copy()
+    test_vs = vs.copy()
+
+    for i in range(ps.shape[1]):
+        time_indices = pps.iloc[:, i].dropna().index
+        if len(time_indices) == 0:
+            continue
+        end_f_id = time_indices[-1]  # for preceding vehicle
+        is_initial_state = True
+        for t in pps.iloc[:, i].dropna().index[1:]:
+            if t == end_f_id:
+                # filter out the original value
+                test_ps.loc[t+1:, i] = None
+                test_vs.loc[t+1:, i] = None
+                break
+            proceeding_displacement_data = pps.loc[t, i] - pps.loc[t-1, i]          # scalar
+            input_data = np.asarray([
+                proceeding_displacement_data,  # proceeding_displacement
+            ])[np.newaxis, np.newaxis, :]
+            new_partial_gap = model.predict(input_data, is_initial_state)
+            if new_partial_gap >= 0:
+                # # acceleration controller:
+                # max_acc = 2     # m/s^2
+                # min_acc = -4    # m/s^2
+                # max_displacement_increase = max_acc*0.1*0.1   # m
+                # min_displacement_decrease = min_acc*0.1*0.1  # m
+                # last_gap = pps.loc[t-1, i] - test_ps.loc[t-1, i]
+                # last_displacement = test_ps.loc[t, i] - test_ps.loc[t-1, i]
+                # new_partial_gap = max(new_partial_gap, last_gap - max_displacement_increase - last_displacement)
+                # new_partial_gap = min(new_partial_gap, last_gap - min_displacement_decrease - last_displacement)
+
+                # without controller
+                new_gap = new_partial_gap + (pps.loc[t + 1, i] - pps.loc[t, i])  # the total gap
+                # value assignment
+                test_ps.loc[t + 1, i] = pps.loc[t + 1, i] - new_gap  # assign the predicted value to test set
+                test_vs.loc[t + 1, i] = (test_ps.loc[t+1, i] - test_ps.loc[t, i]) / 0.1
+                if is_initial_state:
+                    # filter out the original value
+                    test_ps.loc[:t, i] = None
+                    test_vs.loc[:t, i] = None
+                is_initial_state = False
+    plt.figure(0, figsize=(10, 10))
+    plt.title('Position')
+    plt.cla()
+    plt.plot(ps, 'k-')
+    plt.plot(test_ps.iloc[:, 1:], 'r--')
+    # plt.ylim((0, 400))
+
+    # test.f, test.ax = plt.subplots(test_config.sim_car_num-1, 1)
+    # test.f.suptitle('Velocity')
+    # for i in range(test_config.sim_car_num-1):
+    #     test.ax[i].plot(vs.iloc[:, i + 1], 'k-')
+    #     test.ax[i].plot(test_vs.iloc[:, i + 1], 'r--')
+
+    plt.show()
+
+
+def test_on_car_id(model, test_config):
     """
     Use proceeding displacement_0 to predict next gap without proceeding displacement_1
     (or the real gap - proceeding displacement). In other word,
@@ -347,7 +399,7 @@ def test(model, test_config):
     """
     plt.ion()
     model.restore(test_config.restore_path + '_' + test_config.predict)
-    ps, vs= test_config.data
+    ps, vs = test_config.data
 
     test_ps = ps.copy()
     test_vs = vs.copy()
@@ -413,11 +465,12 @@ def train(train_config, test_config):
     data = RNNDataSet(train_config.basket_len)
     train_rnn = RNN(train_config)
     test_rnn = RNN(test_config)
+    state_ = train_rnn.run(train_rnn.cell_initial_state)
     for i in range(train_config.iter_steps):
         b_xs, b_ys, zero_initial_state = data.next(train_config.batch_size, train_config.time_steps)  # this for a batch
         if zero_initial_state:
             state_ = train_rnn.run(train_rnn.cell_initial_state)
-        feed_dict = {train_rnn.xs: b_xs, train_rnn.ys: b_ys, train_rnn.cell_initial_state: state_, train_rnn.global_step: i}
+        feed_dict = {train_rnn.xs: b_xs, train_rnn.ys: b_ys, train_rnn._cell_initial_state: state_, train_rnn.global_step: i}
         _, state_, cost_, lr_, pred_ = train_rnn.run([train_rnn.train_op, train_rnn.cell_final_state, train_rnn.cost, train_rnn.lr, train_rnn.pred],
                                           feed_dict=feed_dict)
         # res_pred = pred_[:train_config.time_steps, 0].flatten()
@@ -428,11 +481,10 @@ def train(train_config, test_config):
             # plotter.update()
             print('step:', i, 'cost: ', cost_, 'lr: ', lr_)
             print("Save to path: ", train_rnn.save('tmp/rnn_{}'.format(train_config.predict)))
-            test(test_rnn, test_config)
+            test_on_frame_id(test_rnn, test_config)
             plt.pause(0.001)
             print('done plot')
         # plotter.plt_time += train_config.time_steps
-
 
 
 class TrainConfig(object):
@@ -449,7 +501,7 @@ class TrainConfig(object):
     basket_len = [20, 100, 300, 1000]
     predict = 'partial_gap'
     batch_size = 50
-    time_steps = 10
+    time_steps = 20
     input_size = 1
     output_size = 1
     cell_layers = 1
@@ -476,12 +528,55 @@ class TestConfig(object):
     on_test = True
     restore_path = 'tmp/rnn'
     sim_car_num = 9
-    start_car_id = 890
+    # start_car_id = 890          # 890 has good result
+
+
+    # available [2700, 3000] position [90, 350]    with oscillation
+    # available [6000, 6500] position [0, 400]    with oscillation, no lane changing
+    # available [3700, 4000] position [0, 340]    with slightly oscillation, no lane changing
+    # available [2200, 2400] position [150, 320]   without oscillation
+    # available [3200, 3500] position [80, 400]    without oscillation, with lane changing
+
+    frame_id_range = [6500, 7000]           # the minimum is 12, the maximum is 9974
+    position_range = [0, 700]
 
     def __init__(self):
-        self.data = self.get_test_date()
+        if hasattr(self, 'start_car_id'):
+            self.data = self.get_test_date_by_id()
+        if hasattr(self, 'frame_id_range'):
+            self.data = self.get_test_data_by_time()
 
-    def get_test_date(self):
+    def get_test_data_by_time(self):
+        df = pd.read_pickle(self.data_path)[['Vehicle_ID', 'Frame_ID',
+                                             'deri_v', 'dx', 'filter_position',
+                                             'proceeding_displacement',
+                                             'proceeding_position']].astype(np.float32)
+        df = df[(df['filter_position'] > self.position_range[0]) & (df['filter_position'] < self.position_range[1])]
+        df_in_frame_range = df[(df['Frame_ID'] >= self.frame_id_range[0]) & (df['Frame_ID'] <= self.frame_id_range[1])]
+        car_ids = np.unique(df_in_frame_range['Vehicle_ID'])
+        ps = pd.DataFrame()
+        vs = pd.DataFrame()
+        pps = pd.DataFrame()
+        for i, car_id in enumerate(car_ids):
+            car_data = df_in_frame_range[df_in_frame_range['Vehicle_ID'] == car_id]
+            car_data = car_data.set_index(['Frame_ID'])
+            car_position = car_data['filter_position']
+            car_speed = car_data['deri_v']
+            car_proceeding_position = car_data['proceeding_position']
+            # shape (time, n_car) for positions
+            ps = pd.concat([ps, car_position.rename(i)], axis=1)
+            # shape (time, n_car) for speeds
+            vs = pd.concat([vs, car_speed.rename(i)], axis=1)
+            pps = pd.concat([pps, car_proceeding_position.rename(i)], axis=1)
+
+        plt.plot(ps, 'r-')
+        plt.plot(pps, '--', lw=2)
+        plt.show()
+        exit()
+
+        return [ps, vs, pps]
+
+    def get_test_date_by_id(self):
         df = pd.read_pickle(self.data_path)[['filter_position', 'Vehicle_ID', 'Frame_ID', 'displacement',
                                              'deri_v', 'deri_a_clipped', 'dx',
                                              'proceeding_displacement']].dropna().astype(np.float32)

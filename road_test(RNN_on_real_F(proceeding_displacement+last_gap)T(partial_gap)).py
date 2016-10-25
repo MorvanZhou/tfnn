@@ -14,10 +14,12 @@ class RNNDataSet(object):
         for bl in basket_len:
             # feature panel, shape (sample_num, time_steps, input_size)
             # proceeding displacement is the only input
-            f_pn = pd.read_pickle('datasets/b{}_f(dis_l+gap).pickle'.format(bl)).as_matrix()
+            f_pn = pd.read_pickle(
+                'datasets/RNN_F(proceeding_displacement+last_gap)T(partial_gap)/b{}_f(dis_l+gap).pickle'.format(bl)).as_matrix()
             # target panel, shape (sample_num, time_steps, output_size)
             # gap is the only output
-            t_pn = pd.read_pickle('datasets/b{}_t(partial_gap).pickle'.format(bl)).as_matrix()
+            t_pn = pd.read_pickle(
+                'datasets/RNN_F(proceeding_displacement+last_gap)T(partial_gap)/b{}_t(partial_gap).pickle'.format(bl)).as_matrix()
             self.features[bl] = f_pn
             self.targets[bl] = t_pn
 
@@ -109,14 +111,22 @@ class DataSet(object):
         # target = b0[1][0] (one sample) with shape of (basket_time_steps, )
         # features = b0[0] ==> shape (basket_time_steps, inputs, sample_num) ==> transpose to (sample_num, basket_time_steps, inputs)
         # targets = b0[1] ==> shape (outputs, basket_time_steps, sample_num) ==> transpose to (sample_num, basket_time_steps, outputs)
-        pd.Panel(np.dstack(b0[0]).transpose(2, 0, 1)).to_pickle('datasets/b1000_f(dis_l+gap).pickle')
-        pd.Panel(np.dstack(b0[1]).transpose(2, 1, 0)).to_pickle('datasets/b1000_t(partial_gap).pickle')
-        pd.Panel(np.dstack(b1[0]).transpose(2, 0, 1)).to_pickle('datasets/b300_f(dis_l+gap).pickle')
-        pd.Panel(np.dstack(b1[1]).transpose(2, 1, 0)).to_pickle('datasets/b300_t(partial_gap).pickle')
-        pd.Panel(np.dstack(b2[0]).transpose(2, 0, 1)).to_pickle('datasets/b100_f(dis_l+gap).pickle')
-        pd.Panel(np.dstack(b2[1]).transpose(2, 1, 0)).to_pickle('datasets/b100_t(partial_gap).pickle')
-        pd.Panel(np.dstack(b3[0]).transpose(2, 0, 1)).to_pickle('datasets/b40_f(dis_l+gap).pickle')
-        pd.Panel(np.dstack(b3[1]).transpose(2, 1, 0)).to_pickle('datasets/b40_t(partial_gap).pickle')
+        pd.Panel(np.dstack(b0[0]).transpose(2, 0, 1)).to_pickle(
+            'datasets/RNN_F(proceeding_displacement+last_gap)T(partial_gap)/b1000_f(dis_l+gap).pickle')
+        pd.Panel(np.dstack(b0[1]).transpose(2, 1, 0)).to_pickle(
+            'datasets/RNN_F(proceeding_displacement+last_gap)T(partial_gap)/b1000_t(partial_gap).pickle')
+        pd.Panel(np.dstack(b1[0]).transpose(2, 0, 1)).to_pickle(
+            'datasets/RNN_F(proceeding_displacement+last_gap)T(partial_gap)/b300_f(dis_l+gap).pickle')
+        pd.Panel(np.dstack(b1[1]).transpose(2, 1, 0)).to_pickle(
+            'datasets/RNN_F(proceeding_displacement+last_gap)T(partial_gap)/b300_t(partial_gap).pickle')
+        pd.Panel(np.dstack(b2[0]).transpose(2, 0, 1)).to_pickle(
+            'datasets/RNN_F(proceeding_displacement+last_gap)T(partial_gap)/b100_f(dis_l+gap).pickle')
+        pd.Panel(np.dstack(b2[1]).transpose(2, 1, 0)).to_pickle(
+            'datasets/RNN_F(proceeding_displacement+last_gap)T(partial_gap)/b100_t(partial_gap).pickle')
+        pd.Panel(np.dstack(b3[0]).transpose(2, 0, 1)).to_pickle(
+            'datasets/RNN_F(proceeding_displacement+last_gap)T(partial_gap)/b40_f(dis_l+gap).pickle')
+        pd.Panel(np.dstack(b3[1]).transpose(2, 1, 0)).to_pickle(
+            'datasets/RNN_F(proceeding_displacement+last_gap)T(partial_gap)/b40_t(partial_gap).pickle')
 
 
 class Plotter(object):
@@ -197,66 +207,71 @@ class RNN(object):
             if self._is_training:
                 self._global_step = tf.placeholder(tf.int32, [], name='global_step')
 
-        with tf.variable_scope('input_layer'):
-            l_in_x = tf.reshape(self.xs, [-1, self._input_size], name='2_2D')  # (batch*n_step, in_size)
-            # Ws (in_size, cell_size)
-            Wi = self._weight_variable([self._input_size, self._cell_size])
-            # bs (cell_size, )
-            bi = self._bias_variable([self._cell_size, ])
-            # l_in_y = (batch * n_steps, cell_size)
-            with tf.name_scope('Wx_plus_b'):
-                l_in_y = tf.matmul(l_in_x, Wi) + bi
-            # with tf.name_scope('activation'):
-            #     l_in_y = tf.nn.relu(l_in_y)
-            # reshape l_in_y ==> (batch, n_steps, cell_size)
-            l_in_y = tf.reshape(l_in_y, [-1, self._time_steps, self._cell_size], name='2_3D')
+        with tf.name_scope('RNN'):
+            with tf.variable_scope('input_layer'):
+                l_in_x = tf.reshape(self.xs, [-1, self._input_size], name='2_2D')  # (batch*n_step, in_size)
+                # Ws (in_size, cell_size)
+                Wi = self._weight_variable([self._input_size, self._cell_size])
+                # bs (cell_size, )
+                bi = self._bias_variable([self._cell_size, ])
+                # l_in_y = (batch * n_steps, cell_size)
+                with tf.name_scope('Wx_plus_b'):
+                    l_in_y = tf.matmul(l_in_x, Wi) + bi
+                # with tf.name_scope('activation'):
+                #     l_in_y = tf.nn.relu(l_in_y)
+                # reshape l_in_y ==> (batch, n_steps, cell_size)
+                l_in_y = tf.reshape(l_in_y, [-1, self._time_steps, self._cell_size], name='2_3D')
 
-        with tf.variable_scope('lstm_cell'):
-            # cell = tf.nn.rnn_cell.BasicLSTMCell(self._cell_size, forget_bias=1.0, state_is_tuple=True)
-            cell = tf.nn.rnn_cell.BasicRNNCell(self._cell_size)
-            if self._cell_layers > 1:
-                cell = tf.nn.rnn_cell.MultiRNNCell([cell] * self._cell_layers, state_is_tuple=True)
-            if self._is_training and self._keep_prob < 1:
-                cell = tf.nn.rnn_cell.DropoutWrapper(
-                    cell,
-                    input_keep_prob=1.,
-                    output_keep_prob=self._keep_prob)
-            with tf.name_scope('initial_state'):
-                self._cell_initial_state = cell.zero_state(self._batch_size, dtype=tf.float32)
+            with tf.variable_scope('lstm_cell'):
+                # cell = tf.nn.rnn_cell.BasicLSTMCell(self._cell_size, forget_bias=1.0, state_is_tuple=True)
+                cell = tf.nn.rnn_cell.BasicRNNCell(self._cell_size)
+                if self._cell_layers > 1:
+                    cell = tf.nn.rnn_cell.MultiRNNCell([cell] * self._cell_layers, state_is_tuple=True)
+                if self._is_training and self._keep_prob < 1:
+                    cell = tf.nn.rnn_cell.DropoutWrapper(
+                        cell,
+                        input_keep_prob=1.,
+                        output_keep_prob=self._keep_prob)
+                with tf.name_scope('initial_state'):
+                    self._cell_initial_state = cell.zero_state(self._batch_size, dtype=tf.float32)
 
-            self.cell_outputs = []
-            for t in range(self._time_steps):
-                if not hasattr(self, 'cell_state'):
-                    self.cell_output, self.cell_state = cell(l_in_y[:, t, :], self._cell_initial_state)
-                else:
-                    tf.get_variable_scope().reuse_variables()
-                    self.cell_output, self.cell_state = cell(l_in_y[:, t, :], self.cell_state)
-                self.cell_outputs.append(self.cell_output)
-            self._cell_final_state = self.cell_state
+                self.cell_outputs = []
+                cell_state = self._cell_initial_state
+                for t in range(self._time_steps):
+                    if t > 0: tf.get_variable_scope().reuse_variables()
+                    cell_output, cell_state = cell(l_in_y[:, t, :], cell_state)
+                    self.cell_outputs.append(cell_output)
+                self._cell_final_state = cell_state
 
-        with tf.variable_scope('output_layer'):
-            # cell_outputs_reshaped (BATCH*TIME_STEP, CELL_SIZE)
-            cell_outputs_reshaped = tf.reshape(tf.concat(1, self.cell_outputs), [-1, self._cell_size])
-            Wo = self._weight_variable((self._cell_size, self._output_size))
-            bo = self._bias_variable((self._output_size,))
-            product = tf.matmul(cell_outputs_reshaped, Wo) + bo
-            # _pred shape (batch*time_step, output_size)
-            self._pred = tf.nn.relu(product)    # for displacement
+            with tf.variable_scope('output_layer'):
+                # cell_outputs_reshaped (BATCH*TIME_STEP, CELL_SIZE)
+                cell_outputs_reshaped = tf.reshape(tf.concat(1, self.cell_outputs), [-1, self._cell_size])
+                Wo = self._weight_variable((self._cell_size, self._output_size))
+                bo = self._bias_variable((self._output_size,))
+                product = tf.matmul(cell_outputs_reshaped, Wo) + bo
+                # _pred shape (batch*time_step, output_size)
+                self._pred = tf.nn.relu(product)    # for displacement
 
         with tf.name_scope('cost'):
-            loss_weights = tf.ones([self._batch_size*self._time_steps*self._output_size])
-            # compute cost for the cell_outputs
-            loss = tf.nn.seq2seq.sequence_loss(
-                [tf.reshape(self._pred, [-1], name='reshape_pred')],
-                [tf.reshape(self.ys, [-1], name='reshape_target')],
-                [loss_weights],
-                average_across_timesteps=True,
-                average_across_batch=True,
-                softmax_loss_function=self.ms_error,
-                name='loss'
-            )
-            self._cost = loss
+            # loss_weights = tf.ones([self._batch_size*self._time_steps*self._output_size])
+            # # compute cost for the cell_outputs
+            # loss = tf.nn.seq2seq.sequence_loss(
+            #     [tf.reshape(self._pred, [-1], name='reshape_pred')],
+            #     [tf.reshape(self.ys, [-1], name='reshape_target')],
+            #     [loss_weights],
+            #     average_across_timesteps=False,
+            #     average_across_batch=True,
+            #     softmax_loss_function=self.ms_error,
+            #     name='loss'
+            # )
+            # self._cost = loss
                 # tf.div(tf.reduce_sum(losses, name='losses_sum'), self._batch_size, name='average_cost')
+            _pred = tf.reshape(self._pred, [self._batch_size, self._time_steps, self._output_size])
+            mse = self.ms_error(_pred, self._ys)
+            mse_ave_across_batch = tf.reduce_mean(mse, 0)
+            mse_sum_across_time = tf.reduce_sum(mse_ave_across_batch, 0)
+            # mse_sum_across_outputs = tf.reduce_sum(mse_sum_across_time, 0)
+            self._cost = mse_sum_across_time
 
         if self._is_training:
             with tf.name_scope('trian'):
