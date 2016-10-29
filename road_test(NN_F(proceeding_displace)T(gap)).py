@@ -50,9 +50,10 @@ def train_(train_config, predict, test_config):
     # v_xs, v_ys = data.next(2000, train_config.time_steps, predict)
     all_data = pd.read_pickle(train_config.data_path)
     X = all_data[list(range(20-train_config.time_steps, 20))]
-    normal_data = tfnn.Data(X, all_data.iloc[:, -1])
+    data = tfnn.Data(X, all_data.iloc[:, -1])
+    train_nn = tfnn.RegNetwork(data.xs.shape[1], data.ys.shape[1], do_dropout=False)
+    normal_data = train_nn.normalizer.minmax(data)
     t_data, v_data = normal_data.train_test_split(0.95)
-    train_nn = tfnn.RegNetwork(t_data.xs.shape[1], t_data.ys.shape[1], do_dropout=False)
     h1 = tfnn.HiddenLayer(train_config.hidden_layers[0], activator='relu')
     out = tfnn.OutputLayer(activator='relu')
     train_nn.build_layers([h1, out])
@@ -69,11 +70,11 @@ def train_(train_config, predict, test_config):
         train_nn.run_step(b_xs, b_ys)
         if step % PLOT_LOOP == 0:
             evaluator.monitoring(b_xs, b_ys, v_xs=v_data.xs, v_ys=v_data.ys)
-        if step % TEST_LOOP == 0:
-            test_(test_config, 890, PREDICT, model=train_nn)
+        # if step % TEST_LOOP == 0:
+        #     test_(test_config, 890, PREDICT, model=train_nn)
     print('finish training')
     evaluator.hold_plot()
-    train_nn.save('nn', 'tmp', replace=True)
+    train_nn.save('NNgap(1.0)', 'tmp', replace=True)
     return train_nn
 
 
@@ -102,7 +103,7 @@ def test_(test_config, id, predict, model=None):
 
             if predict == 'gap':
                 input_data = proceeding_dispms_data * test_config.displacement_scale + test_config.displacement_bias,  # displacement
-                new_gap = model.predict(input_data)
+                new_gap = model.predict(model.normalizer.fit_transform(input_data))
                 test_ps.loc[t + test_config.time_steps, i] = ps.loc[t+test_config.time_steps, i-1] - new_gap
                 if not has_been_dropped:
                     test_ps.loc[:t + test_config.time_steps-1, i] = None
@@ -111,15 +112,30 @@ def test_(test_config, id, predict, model=None):
             else:
                 raise ValueError('not support')
 
-    plt.figure(0)
-    if not none_model:
-        plt.ion()
-        plt.cla()
-    plt.title('Position')
-    plt.plot(ps, 'k-')
-    plt.plot(test_ps.iloc[:, 1:], 'r--')
+    plt.style.use('classic')
+    predict = 'pg'
+    model_name = 'NN{0}({1:.1f})'.format(predict, test_config.time_steps/10)
+    base_dir = 'NN%s(%s)/' % (predict, test_config.time_steps/10)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    ps.index /= 10
+    test_ps.index /= 10
+    ax.plot(ps, 'k-', label='$I-80$')
+    ax.plot(test_ps.iloc[:, 1:], 'r--', label='${}$'.format(model_name))
+    fig.suptitle('$Simulate\ trajectory\ on\ %s\ data$' % 'predicted')
+    ax.set_xlabel('$Time\ (s)$')
+    ax.set_ylabel('$Position\ (m)$')
+    for i in range(1, test_config.sim_car_num ):
+        traj = ps.iloc[:, i].dropna()
+        x = traj.index[0]
+        y = traj.iloc[0]
+        ax.text(x - 1, y - 13, '$f{}$'.format(i))
+    handles, labels = ax.get_legend_handles_labels()
+    plt.legend([handles[0], handles[-1]], [labels[0], labels[-1]], loc='best')
     plt.ylim((0, 400))
-    plt.show()
+    plt.savefig(base_dir + 'NN%s_traj.png' % (predict), format='png', dpi=1000)
+
 
 def set_seed(seed):
     tfnn.set_random_seed(11)
@@ -137,23 +153,23 @@ class TrainConfig(object):
     data_path = 'datasets/I80-0500-0515-filter_0.8_T_F(proceeding_displace)T(gap)_4NN_300000.pickle'
 
     batch_size = 50
-    time_steps = 5
+    time_steps = 10
     displacement_scale = 1/3.5
     displacement_bias = - 0.5
     gap_scale = 1/86
     gap_bias = -0.5
-    hidden_layers = [50]
+    hidden_layers = [time_steps*3]
     is_training = True
     keep_prob = 1
     learning_rate = 1e-3
-    decay_steps = 2000
+    decay_steps = 3000
     decay_rate = 1
 
 
 class TestConfig(object):
     data_path = 'datasets/I80-0400_lane2_proceeding_position&displacement.pickle'
     batch_size = 1
-    time_steps = 5
+    time_steps = 10
     displacement_scale = 1 / 3.5
     displacement_bias = - 0.5
     gap_scale = 1 / 86
@@ -161,7 +177,7 @@ class TestConfig(object):
     output_size = 1
     is_training = False
     restore_path = 'tmp'
-    restore_model = 'nn'
+    restore_model = 'NNgap(1.0)'
     sim_car_num = 9
     start_car_id = 890
 
@@ -203,7 +219,7 @@ if __name__ == '__main__':
     """
     # set_seed(1)
 
-    ITER_STEPS = 80001
+    ITER_STEPS = 30001
     PLOT_LOOP = 500
     TEST_LOOP = 5000
     PREDICT = 'gap'
@@ -217,4 +233,4 @@ if __name__ == '__main__':
     # pd.DataFrame(all_data).to_pickle('datasets/I80-0500-0515-filter_0.8_T_F-displace_gap_T-displace_4NN_normalized300000.pickle')
 
     train_nn = train_(train_config, PREDICT, test_config)
-    # test_(test_config, 890, PREDICT, on_test=False, model=None)
+    # test_(test_config, 890, PREDICT, model=None)

@@ -11,8 +11,4 @@ class Monitor(object):
     def monitoring(self, *args, **kwargs):
         pass
 
-    @staticmethod
-    def hold_plot():
-        plt.ioff()
-        plt.show()
 

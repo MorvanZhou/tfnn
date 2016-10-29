@@ -139,8 +139,10 @@ class Evaluator(object):
 
     @staticmethod
     def hold_plot():
+        print('Press any key to exit...')
         plt.ioff()
-        plt.show()
+        plt.waitforbuttonpress()
+        plt.close()
 
     def _set_accuracy(self):
         if isinstance(self.network, tfnn.ClfNetwork):

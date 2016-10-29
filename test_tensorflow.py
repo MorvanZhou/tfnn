@@ -12,21 +12,21 @@ import numpy as np
 
 tfnn.set_random_seed(100)
 
-xs = load_iris().data
-ys = load_iris().target
+# xs = load_iris().data
+# ys = load_iris().target
 # xs = fetch_olivetti_faces().data
 # ys = fetch_olivetti_faces().target[:, np.newaxis]
 
-# xs = np.linspace(-5, 5, 100000)[:, np.newaxis]
-# ys = xs**2 + np.random.normal(size=xs.shape)
+xs = np.linspace(-5, 5, 1000)[:, np.newaxis]
+ys = xs**2 + np.random.normal(size=xs.shape)
 
 data = tfnn.Data(xs, ys)
 data.shuffle(inplace=True)
-data.onehot_encode_y(True)
+# data.onehot_encode_y(True)
 
 # network = tfnn.ClfNetwork(mnist.train.images.shape[1], mnist.train.labels.shape[1], do_dropout=False)
-network = tfnn.ClfNetwork(data.xs.shape[1], data.ys.shape[1], )
-# network = tfnn.RegNetwork(data.xs.shape[1], data.ys.shape[1], do_dropout=True)
+# network = tfnn.ClfNetwork(data.xs.shape[1], data.ys.shape[1], )
+network = tfnn.RegNetwork(data.xs.shape[1], data.ys.shape[1], do_dropout=True)
 norm_data = network.normalizer.minmax(data)
 t_data, v_data = norm_data.train_test_split(0.7)
 
@@ -40,7 +40,7 @@ network.set_learning_rate(lr=0.01, exp_decay=dict(decay_steps=1000, decay_rate=0
 
 evaluator = tfnn.Evaluator(network)
 # evaluator.set_line_fitting_monitor()
-# evaluator.set_data_fitting_monitor()
+evaluator.set_data_fitting_monitor()
 # evaluator.set_scale_monitor(['cost', 'accuracy', 'learning rate', 'f1', 'recall'], figsize=(7, 7))
 # evaluator.set_layer_monitor([0, 1, 2], cbar_range=(-0.4, 0.4))
 
@@ -48,7 +48,7 @@ evaluator = tfnn.Evaluator(network)
 # summarizer = tfnn.Summarizer(network, save_path='tmp',)
 
 st = time.time()
-for i in range(2000):
+for i in range(1000):
     b_xs, b_ys = t_data.next_batch(50)
     # b_xs, b_ys = mnist.train.next_batch(50)
     network.run_step(b_xs, b_ys, keep_prob=0.5)
@@ -66,6 +66,6 @@ for i in range(2000):
         # summarizer.record_test(mnist.test.images, mnist.test.labels, i)
 evaluator.hold_plot()
 # summarizer.web_visualize()
-network.sess.close()
+# network.sess.close()
 
 

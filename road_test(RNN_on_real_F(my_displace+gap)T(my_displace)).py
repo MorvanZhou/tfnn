@@ -405,12 +405,29 @@ def test(model, test_config, id):
             else:
                 raise ValueError('not support')
 
-    plt.figure(0)
-    plt.title('Position')
-    plt.cla()
-    plt.plot(ps, 'k-')
-    plt.plot(test_ps.iloc[:, 1:], 'r--')
+    plt.style.use('classic')
+    predict = 'disp'
+    model_name = 'RNN{0}({1:.1f})'.format(predict, train_config.time_steps)
+    base_dir = 'RNN%s(%s)/' % (predict, train_config.time_steps / 10)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    ps.index /= 10
+    test_ps.index /= 10
+    ax.plot(ps, 'k-', label='$I-80$')
+    ax.plot(test_ps.iloc[:, 1:], 'r--', label='${}$'.format(model_name))
+    fig.suptitle('$Simulate\ trajectory\ on\ %s\ data$' % 'predicted')
+    ax.set_xlabel('$Time\ (s)$')
+    ax.set_ylabel('$Position\ (m)$')
+    for i in range(1, test_config.sim_car_num):
+        traj = ps.iloc[:, i].dropna()
+        x = traj.index[0]
+        y = traj.iloc[0]
+        ax.text(x - 1, y - 13, '$f{}$'.format(i))
+    handles, labels = ax.get_legend_handles_labels()
+    plt.legend([handles[0], handles[-1]], [labels[0], labels[-1]], loc='best')
     plt.ylim((0, 400))
+    plt.savefig(base_dir + 'RNN%s_traj.png' % (predict), format='png', dpi=1000)
 
     # f, ax = plt.subplots(8, 1)
     # f.suptitle('Velocity')
@@ -439,7 +456,7 @@ def train(train_config, test_config):
     train_rnn = RNN(train_config, is_training=True)
     # merged = tf.merge_all_summaries()
     # writer = tf.train.SummaryWriter("logs/", train_rnn.sess.graph)
-    test_rnn = RNN(test_config, is_training=False)
+    # test_rnn = RNN(test_config, is_training=False)
     for i in range(train_config.iter_steps):
         b_xs, b_ys, zero_initial_state = data.next(train_config.batch_size, train_config.time_steps)  # this for a batch
         if zero_initial_state:
@@ -462,9 +479,9 @@ def train(train_config, test_config):
             # plotter.update()
             print('step:', i, 'cost: ', cost_, 'lr: ', lr_)
             print("Save to path: ", train_rnn.save('tmp/rnn_{}'.format(train_config.predict)))
-            test(test_rnn, test_config, 890)
-            plt.pause(0.001)
-            print('done plot')
+            # test(test_rnn, test_config, 890)
+            # plt.pause(0.001)
+            # print('done plot')
         # plotter.plt_time += train_config.time_steps
 
 
@@ -477,12 +494,12 @@ class TrainConfig(object):
     data_path = 'datasets/I80-0500-0515-filter_0.8_T_v_ldxdvhdisplace.pickle'
 
     # data_path = 'datasets/I80-0400_lane2.pickle'
-    iter_steps = 100001
+    iter_steps = 50001
     plot_loop = 5000
     basket_len = [40, 100, 300, 1000]
     predict = 'displacement'
     batch_size = 32
-    time_steps = 5
+    time_steps = 10
     input_size = 2
     output_size = 1
     cell_layers = 1
@@ -573,6 +590,7 @@ if __name__ == '__main__':
 
     # TODO: set the output as next input sep2sep model: https://github.com/tensorflow/tensorflow/blob/master/tensorflow/models/rnn/translate/seq2seq_model.py
     # https://www.tensorflow.org/versions/r0.11/tutorials/seq2seq/index.html
-    train(train_config, test_config)
+    # train(train_config, test_config)
 
-    # test(test_config, id=890, on_test=True, predict=train_config.predict)
+    test_rnn = RNN(test_config, is_training=False)
+    test(test_rnn, test_config, id=890)

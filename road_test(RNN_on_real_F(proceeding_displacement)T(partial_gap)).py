@@ -398,7 +398,7 @@ def test_on_car_id(model, test_config):
     using last real gap - this gap without movement of proceeding car.
     """
     plt.ion()
-    model.restore(test_config.restore_path + '_' + test_config.predict)
+    model.restore(test_config.restore_path)
     ps, vs = test_config.data
 
     test_ps = ps.copy()
@@ -433,12 +433,29 @@ def test_on_car_id(model, test_config):
             else:
                 raise ValueError('not support')
 
-    plt.figure(0)
-    plt.title('Position')
-    plt.cla()
-    plt.plot(ps, 'k-')
-    plt.plot(test_ps.iloc[:, 1:], 'r--')
+    plt.style.use('classic')
+    predict = 'pg'
+    model_name = 'RNN{0}({1:.1f})'.format(predict, train_config.time_steps/10)
+    base_dir = 'RNN%s(%s)/' % (predict, train_config.time_steps / 10)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    ps.index /= 10
+    test_ps.index /= 10
+    ax.plot(ps, 'k-', label='$I-80$')
+    ax.plot(test_ps.iloc[:, 1:], 'r--', label='${}$'.format(model_name))
+    fig.suptitle('$Predicted\ trajectory$')
+    ax.set_xlabel('$Time\ (s)$')
+    ax.set_ylabel('$Position\ (m)$')
+    for i in range(1, test_config.sim_car_num):
+        traj = ps.iloc[:, i].dropna()
+        x = traj.index[0]
+        y = traj.iloc[0]
+        ax.text(x - 1, y - 13, '$f{}$'.format(i))
+    handles, labels = ax.get_legend_handles_labels()
+    plt.legend([handles[0], handles[-1]], [labels[0], labels[-1]], loc='best')
     plt.ylim((0, 400))
+    plt.savefig(base_dir + 'RNN%s_traj.png' % (predict), format='png', dpi=1000)
 
     # test.f, test.ax = plt.subplots(test_config.sim_car_num-1, 1)
     # test.f.suptitle('Velocity')
@@ -480,10 +497,10 @@ def train(train_config, test_config):
         if i % train_config.plot_loop == 0:
             # plotter.update()
             print('step:', i, 'cost: ', cost_, 'lr: ', lr_)
-            print("Save to path: ", train_rnn.save('tmp/rnn_{}'.format(train_config.predict)))
-            test_on_frame_id(test_rnn, test_config)
-            plt.pause(0.001)
-            print('done plot')
+    print("Save to path: ", train_rnn.save('tmp/RNNpg(1.0)'))
+            # test_on_frame_id(test_rnn, test_config)
+            # plt.pause(0.001)
+            # print('done plot')
         # plotter.plt_time += train_config.time_steps
 
 
@@ -501,7 +518,7 @@ class TrainConfig(object):
     basket_len = [20, 100, 300, 1000]
     predict = 'partial_gap'
     batch_size = 50
-    time_steps = 20
+    time_steps = 10
     input_size = 1
     output_size = 1
     cell_layers = 1
@@ -526,9 +543,9 @@ class TestConfig(object):
     is_training = False
     weighted_cost = True
     on_test = True
-    restore_path = 'tmp/rnn'
+    restore_path = 'tmp/RNNpg(1.0)'
     sim_car_num = 9
-    # start_car_id = 890          # 890 has good result
+    start_car_id = 890          # 890 has good result
 
 
     # available [2700, 3000] position [90, 350]    with oscillation
@@ -537,8 +554,8 @@ class TestConfig(object):
     # available [2200, 2400] position [150, 320]   without oscillation
     # available [3200, 3500] position [80, 400]    without oscillation, with lane changing
 
-    frame_id_range = [6500, 7000]           # the minimum is 12, the maximum is 9974
-    position_range = [0, 700]
+    # frame_id_range = [6500, 7000]           # the minimum is 12, the maximum is 9974
+    # position_range = [0, 700]
 
     def __init__(self):
         if hasattr(self, 'start_car_id'):
@@ -569,10 +586,10 @@ class TestConfig(object):
             vs = pd.concat([vs, car_speed.rename(i)], axis=1)
             pps = pd.concat([pps, car_proceeding_position.rename(i)], axis=1)
 
-        plt.plot(ps, 'r-')
-        plt.plot(pps, '--', lw=2)
-        plt.show()
-        exit()
+        # plt.plot(ps, 'r-')
+        # plt.plot(pps, '--', lw=2)
+        # plt.show()
+        # exit()
 
         return [ps, vs, pps]
 
@@ -621,4 +638,8 @@ if __name__ == '__main__':
     # data.put_in_basket(basket_len=train_config.basket_len)
     ###################################
 
-    train(train_config, test_config)
+    # train(train_config, test_config)
+
+    test_rnn = RNN(test_config)
+
+    test_on_car_id(test_rnn, test_config)

@@ -2,9 +2,10 @@ import tfnn
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+plt.style.use('seaborn-paper')
 
 
-def train(data_path, duration, save_to='/tmp/'):
+def train(data_path, duration, save_to='/tmp/', predict='v'):
     # load_data = pd.read_pickle(data_path).iloc[:10000, :]
     # xs = load_data.iloc[:, -60:]
     # load_data = pd.read_csv(data_path, index_col=0).dropna()
@@ -14,33 +15,35 @@ def train(data_path, duration, save_to='/tmp/'):
         lane_data = pd.read_pickle(lane_path).dropna().astype(np.float32)
         load_data = pd.concat([load_data, lane_data], axis=0, ignore_index=True)
     xs = pd.concat([
-        load_data.iloc[:, -60-int(duration*10):-60],        # speed
-        # load_data.iloc[:, -40-int(duration*10):-40],        # leader speed
+        # load_data.iloc[:, -60-int(duration*10):-60],        # speed
+        load_data.iloc[:, -40-int(duration*10):-40],        # leader speed
         load_data.iloc[:, -20-int(duration*10):-20],        # spacing
         load_data.iloc[:, -int(duration*10):]              # relative speed
         ], axis=1)
     print(xs.shape)
     print(xs.head(2))
     print('sample size:', load_data.shape[0])
-    ys = load_data['deri_v']
-    # ys = load_data['deri_a_clipped']
+    if predict == 'v':
+        ys = load_data['deri_v']
+    elif predict == 'a':
+        ys = load_data['deri_a_clipped']
     # ys = load_data['delta_x']
     data = tfnn.Data(xs, ys, name='road_data')
 
     network = tfnn.RegNetwork(xs.shape[1], 1, do_dropout=False)
     n_data = network.normalizer.minmax(data)
-    t_data, v_data = n_data.train_test_split(0.8)
+    t_data, v_data = n_data.train_test_split(0.97)
     # the number of hidden unit is 2 * xs features
-    network.add_hidden_layer(100, activator=tfnn.nn.relu, dropout_layer=False)
-    network.add_hidden_layer(10, activator=tfnn.nn.relu, dropout_layer=False)
+    network.add_hidden_layer(t_data.xs.shape[1] * 3, activator=tfnn.nn.relu, dropout_layer=False)
+    # network.add_hidden_layer(10, activator=tfnn.nn.relu, dropout_layer=False)
     network.add_output_layer(activator=None, dropout_layer=False)
     # lr = tfnn.train.exponential_decay(0.001, global_step, 5000, 0.9, staircase=False)
     network.set_optimizer('Adam')
-    network.set_learning_rate(1e-4, exp_decay=dict(decay_steps=3000, decay_rate=0.8))
+    network.set_learning_rate(3e-4, exp_decay=dict(decay_steps=3000, decay_rate=0.9))
     evaluator = tfnn.Evaluator(network)
     # summarizer = tfnn.Summarizer(network, save_path='/tmp/')
     evaluator.set_data_fitting_monitor()
-    evaluator.set_scale_monitor(['cost', 'r2', 'learning rate'])
+    # evaluator.set_scale_monitor(['cost', 'r2', 'learning rate'])
     for i in range(30000):
         b_xs, b_ys = t_data.next_batch(50)
         network.run_step(b_xs, b_ys, 0.5)
@@ -183,7 +186,7 @@ def test(duration, model_path='tmp', model='/model'):
 
 
 def traj_comparison(data_path, duration, id, model_path='tmp', model='/model',
-                    on_test=True, predict='a'):
+                    on_test=True, predict='a', sim_car_num=8):
     df = pd.read_pickle(data_path)[['filter_position', 'Vehicle_ID', 'Frame_ID',
                                     'deri_v', 'deri_a_clipped']].dropna().astype(np.float32)
     df = df[df['filter_position'] < 380]
@@ -193,7 +196,7 @@ def traj_comparison(data_path, duration, id, model_path='tmp', model='/model',
     vs = pd.DataFrame()
     accs = pd.DataFrame()
     for i, car_id in enumerate(filter_ids):
-        if i > 8:
+        if i > sim_car_num:
             break
         car_data = df[df['Vehicle_ID'] == car_id]
         car_data = car_data.set_index(['Frame_ID'])
@@ -212,10 +215,13 @@ def traj_comparison(data_path, duration, id, model_path='tmp', model='/model',
     test_vs = vs.copy()
     test_accs = accs.copy()
 
-    for i in range(1, 9):
-        end_f_id = test_ps.iloc[:, i-1].dropna().index[-1]
-        for t in test_ps.iloc[:, i].dropna().index[int(duration*10):]:
+    for i in range(1, sim_car_num+1):
+        end_f_id = ps.iloc[:, i-1].dropna().index[-1]
+        for t in ps.iloc[:, i].dropna().index[int(duration*10):]:
             if t == end_f_id:
+                test_ps.loc[t:, i] = None
+                test_vs.loc[t:, i] = None
+                test_accs.loc[t: i] = None
                 break
             # index from test data
             """if use the real ps and vs in here, the predicted acceleration is very close,
@@ -236,75 +242,123 @@ def traj_comparison(data_path, duration, id, model_path='tmp', model='/model',
             vl_data = vs.loc[t-int(duration*10): t-1, i-1]
             dx_data = pl_data - p_data
             dv_data = vl_data - v_data
-            # speed, leader_speed, dx, dv
-            # [furthest, nearest]
             if predict == 'a':
-                # speed, leader_speed, dx
-                # [furthest, nearest]
-                input_data = pd.concat([v_data, vl_data, dx_data])
-                new_a = network.predict(network.normalizer.fit_transform(input_data))
-
-                speed_t2 = test_vs.loc[t, i] + new_a * 0.2
-                speed_t2 = 0 if speed_t2 < 0 else speed_t2
-
-                test_accs.loc[t + 1, i] = new_a
-                test_vs.loc[t + 2, i] = speed_t2
-                test_ps.loc[t + 3, i] = test_ps.loc[t + 1, i] + speed_t2 * 0.2
-            elif predict == 'v':
-                # leader_speed, dx, dv
                 # [furthest, nearest]
                 input_data = pd.concat([
-                    v_data,
-                    # vl_data,
+                    vl_data,
+                    dx_data,
+                    dv_data
+                ])
+                new_a = network.predict(network.normalizer.fit_transform(input_data))
+
+                test_accs.loc[t, i] = new_a
+                if on_test:
+                    test_vs.loc[t, i] = new_a*0.1 + test_vs.loc[t-1, i]
+                    test_ps.loc[t, i] = test_ps.loc[t-1, i] + test_vs.loc[t-1, i]*0.1 + 1/2*new_a*0.01
+
+                # speed_t2 = test_vs.loc[t, i] + new_a * 0.2
+                # speed_t2 = 0 if speed_t2 < 0 else speed_t2
+                #
+                # test_accs.loc[t + 1, i] = new_a
+                # test_vs.loc[t + 2, i] = speed_t2
+                # test_ps.loc[t + 3, i] = test_ps.loc[t + 1, i] + speed_t2 * 0.2
+            elif predict == 'v':
+                # [furthest, nearest]
+                input_data = pd.concat([
+                    # v_data,
+                    vl_data,
                     dx_data,
                     dv_data,
                 ])
                 new_speed = network.predict(network.normalizer.fit_transform(input_data))
 
                 new_speed = 0 if new_speed < 0 else new_speed
-                test_vs.loc[t + 1, i] = new_speed  # next speed
-                test_ps.loc[t + 2, i] = test_ps.loc[t, i] + new_speed * 0.2  # next position
-                if not np.isnan(test_vs.loc[t - 1, i]):
-                    test_accs.loc[t, i] = (new_speed - test_vs.loc[t - 1, i]) / 0.2  # acceleration for now
-            elif predict == 'delta_x':
-                """
-                !!!!
-                bad idea
-                !!!!
-                """
-                # speed, leader_speed, dx
-                # [furthest, nearest]
-                input_data = pd.concat([v_data, vl_data, dx_data])
-                delta_x = network.predict(network.normalizer.fit_transform(input_data))
-                delta_x = 0 if delta_x < 0 else delta_x
-                # delta_x = (v0+v1)*t/2
-                # so v1 = delta_x*2/t - v0
-                test_ps.loc[t, i] = test_ps.loc[t-1, i] + delta_x
-                test_vs.loc[t, i] = delta_x/0.1
-                test_accs.loc[t, i] = (test_vs.loc[t, i] - test_vs.loc[t-1, i])/0.1
+                test_vs.loc[t, i] = new_speed
+                if on_test:
+                    test_accs.loc[t, i] = (new_speed - test_vs.loc[t-1, i])/0.1
+                    test_ps.loc[t, i] = test_ps.loc[t-1, i] + (new_speed + test_vs.loc[t-1, i])*0.1/2
+                # test_vs.loc[t + 1, i] = new_speed  # next speed
+                # test_ps.loc[t + 2, i] = test_ps.loc[t, i] + new_speed * 0.2  # next position
+                # if not np.isnan(test_vs.loc[t - 1, i]):
+                #     test_accs.loc[t, i] = (new_speed - test_vs.loc[t - 1, i]) / 0.2  # acceleration for now
 
-    plt.figure(0)
-    plt.title('Position')
-    plt.plot(ps, 'k-')
-    plt.plot(test_ps.iloc[:, 1:], 'r--')
-    plt.ylim((0, 400))
 
-    # f, ax = plt.subplots(8, 1)
-    # f.suptitle('Velocity')
-    # for i in range(8):
-    #     ax[i].plot(vs.iloc[:, i + 1], 'k-')
-    #     ax[i].plot(test_vs.iloc[:, i + 1], 'r--')
-    #
-    # f, ax = plt.subplots(8, 1)
-    # f.suptitle('Acceleration')
-    # for i in range(8):
-    #     ax[i].plot(accs.iloc[:, i+1], 'k-')
-    #     ax[i].plot(test_accs.iloc[:, i+1], 'r--')
-    #
-    # f, ax = plt.subplots(8, 1)
-    # f.suptitle('test real acceleration diff cumsum')
-    # for i in range(8):
-    #     ax[i].plot((test_accs.iloc[:, i + 1]-accs.iloc[:, i + 1]).cumsum(), 'k-')
+    plt.style.use('classic')
+    model_name = 'NN%s(%.1f)' % (predict, duration)
+    if on_test:
+        real_pred = 'predicted'
+    else:
+        real_pred = 'real'
+    base_dir = 'NN%s(%s)_on_%s/' % (predict, duration, real_pred)
+
+    if on_test:
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+        ps.index /= 10
+        test_ps.index /= 10
+        fig.suptitle('$Simulate\ trajectory\ on\ %s\ data$' % real_pred)
+        ax.plot(ps, 'k-', label='$I-80$')
+        ax.plot(test_ps.iloc[:, 1:], 'r--', label='${}$'.format(model_name))
+        ax.set_xlabel('$Time\ (s)$')
+        ax.set_ylabel('$Position\ (m)$')
+        for i in range(1, sim_car_num+1):
+            traj = ps.iloc[:, i].dropna()
+            x = traj.index[0]
+            y = traj.iloc[0]
+            ax.text(x-1, y-13, '$f{}$'.format(i))
+        handles, labels = ax.get_legend_handles_labels()
+        plt.legend([handles[0], handles[-1]], [labels[0], labels[-1]], loc='best')
+        plt.ylim((0, 400))
+        plt.savefig(base_dir + 'NN%s_on_%s_traj.png' % (predict, real_pred), format='png', dpi=1000)
+
+    if predict == 'v' or on_test:
+        f, ax = plt.subplots(sim_car_num, 1)
+        vs.index /= 10
+        test_vs.index /= 10
+        f.suptitle('$Simulate\ velocity\ (km/h)\ on\ %s\ data$' % real_pred)
+        plt.xlabel('$Time\ (s)$')
+        for i in range(sim_car_num):
+            ax[i].plot(vs.iloc[:, i + 1] * 3.6, 'k-', label='$I-80$')
+            ax[i].plot(test_vs.iloc[:, i + 1] * 3.6, 'r--', label='${}$'.format(model_name))
+            ax[i].yaxis.set_ticks(np.arange(0,
+                                            max(vs.iloc[:, i + 1].dropna()) * 3.6 + 10, 20, dtype=np.int))
+            ax[i].set_ylabel('$f{}$'.format(sim_car_num-i))
+            ax[i].set_ylim((0, max(vs.iloc[:, i + 1].dropna()) * 3.6 + 10))
+            ax[i].legend(loc='lower right', prop={'size':8})
+            if i != sim_car_num-1:
+                plt.setp(ax[i].get_xticklabels(), visible=False)
+        plt.savefig(base_dir + 'NN%s_on_%s_velocity.png' % (predict, real_pred), format='png', dpi=1000)
+
+    if predict == 'a' or on_test:
+        f, ax = plt.subplots(sim_car_num, 1)
+        f.suptitle('$Simulate\ acceleration\ (m/s^2)\ on\ %s\ data$' % real_pred)
+        accs.index /= 10
+        test_accs.index /= 10
+        plt.xlabel('$Time\ (s)$')
+        for i in range(sim_car_num):
+            ax[i].plot(accs.iloc[:, i+1], 'k-', label='$I-80$')
+            ax[i].plot(test_accs.iloc[:, i+1], 'r--', label='${}$'.format(model_name))
+            ax[i].yaxis.set_ticks(np.arange(-4, 5, 4, dtype=np.int))
+            ax[i].set_ylabel('$f{}$'.format(sim_car_num-i))
+            ax[i].set_ylim((-4, 4))
+            ax[i].legend(loc='lower right', prop={'size': 8})
+            if i != sim_car_num-1:
+                plt.setp(ax[i].get_xticklabels(), visible=False)
+        plt.savefig(base_dir + 'NN%s_on_%s_accs.png' % (predict, real_pred), format='png', dpi=1000)
+
+    if on_test:
+        f, ax = plt.subplots(sim_car_num, 1)
+        f.suptitle('$Simulate\ accumulated\ acceleration\ error\ (m/s^2)\ on\ %s\ data$' % real_pred)
+        plt.xlabel('$Time\ (s)$')
+        for i in range(sim_car_num):
+            res = (test_accs.iloc[:, i + 1]-accs.iloc[:, i + 1]).cumsum()
+            ax[i].plot(res, 'k-')
+            ax[i].yaxis.set_ticks(np.arange(min(res.dropna()), max(res.dropna()),
+                                            int((max(res.dropna()) - min(res.dropna()))/2), dtype=np.int))
+            ax[i].set_ylabel('$f{}$'.format(sim_car_num-i))
+            if i != sim_car_num-1:
+                plt.setp(ax[i].get_xticklabels(), visible=False)
+        plt.savefig(base_dir + 'NN%s_on_%s_accumulate.png' % (predict, real_pred), format='png', dpi=1000)
 
     plt.show()
 
@@ -470,14 +524,16 @@ def set_seed(seed):
     np.random.seed(11)
 
 
-
 if __name__ == '__main__':
     # set_seed(1)
 
-    which_lane = [1, 2, 3, 4]
-    path = ['datasets/I80-0400_lane%i.pickle' % lane for lane in which_lane]
+    predict = 'v'
+    on_test = True
     duration = 1
-    train(path, duration, save_to='/model%i/' % int(duration*10))
+
+    which_lane = [1, 3, 4]
+    path = ['datasets/I80-0400_lane%i.pickle' % lane for lane in which_lane]
+    # train(path, duration, save_to='/NN%s%i/' % (predict, int(duration*10)), predict=predict)
 
     # test_path = 'preprocessing/I80-0400_lane2.pickle'
     # compare_real(test_path, duration, model_path='tmp', model='/model%i/' % int(duration*10))
@@ -485,9 +541,12 @@ if __name__ == '__main__':
     # test(duration,  model_path='tmp', model='/model%i/' % int(duration*10))
 
     # cross_validation(path)
+    # oscillation(lane_path, duration, id=890, model='/model%i/' % int(duration*10))
 
     # 512, 517, 418, 121, 191, 242, 392
     lane_path = 'datasets/I80-0400_lane2.pickle'
-    traj_comparison(lane_path, duration, id=890, model='/model%i/' % int(duration*10),
-                    on_test=True, predict='v')
-    # oscillation(lane_path, duration, id=890, model='/model%i/' % int(duration*10))
+    traj_comparison(lane_path, duration, id=890, model='/NN%s%i/' % (predict, int(duration*10)),
+                    on_test=on_test, predict=predict, sim_car_num=8)
+
+
+
