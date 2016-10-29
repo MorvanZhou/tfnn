@@ -5,6 +5,14 @@ import numpy as np
 class Layer(object):
     def __init__(self, activator, dropout_layer, w_initial, name,
                  layer_type,):
+        """
+
+        :param activator: string or tfnn.nn.an_activation
+        :param dropout_layer:
+        :param w_initial:
+        :param name:
+        :param layer_type:
+        """
         self._check_activator(activator)
         self.dropout_layer = dropout_layer
         self.w_initial = w_initial
