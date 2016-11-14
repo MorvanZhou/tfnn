@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import time
-plt.style.use('ggplot')
+# plt.style.use('ggplot')
 
 
 def extract(path='datasets/I80-0400-0415.txt', to_pickle=True):
@@ -161,20 +161,20 @@ def batch_filter(path, T=0.8, selected_filter='f_x', save=True, clip_bound=None)
 def plot_comparison(data, alpha, which):
     vehicle = data[data['Vehicle_ID'] == alpha]
     if which == 'p':
-        vehicle['Local_Y'].plot(c='r')
-        vehicle['filter_position'].plot(c='b')
-        plt.ylabel('position')
-        plt.legend(loc='best')
+        plt.plot(vehicle['Local_Y'])
+        plt.plot(vehicle['filter_position'])
+        plt.ylabel('$Position$')
+        plt.legend(loc='upper right')
     elif which == 'a':
-        vehicle['Vehicle_Acceleration'].plot(c='r')
-        vehicle['deri_a_clipped'].plot(c='b')
-        plt.ylabel('acceleration')
-        plt.legend(loc='best')
+        plt.plot(vehicle['Vehicle_Acceleration'].iloc[40:250], '-k', label='$Unfiltered$')
+        plt.plot(vehicle['deri_a_clipped'].iloc[40:250], '--k', label='$Filtered$')
+        plt.ylabel('$Acceleration$')
+        plt.legend(loc='upper right')
     elif which == 'v':
-        vehicle['Vehicle_Velocity'].plot(c='r')
-        vehicle['deri_v'].plot(c='b')
-        plt.ylabel('speed')
-        plt.legend(loc='best')
+        plt.plot(vehicle['Vehicle_Velocity'].iloc[40:250],'-k', label='$Unfiltered$')
+        plt.plot(vehicle['deri_v'].iloc[40:250], '--k',label='$Filtered$')
+        plt.ylabel('$Velocity$')
+        plt.legend(loc='upper right')
     elif which == 'h':
         vehicle['Headway'].plot(c='r')
         vehicle['filter_headway'].plot(c='b')
@@ -185,7 +185,24 @@ def plot_comparison(data, alpha, which):
         vehicle['filter_spacing'].plot(c='b')
         plt.ylabel('spacing')
         plt.legend(loc='best')
-    plt.xlabel('time')
+    elif which == 'a and v':
+        f, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+        ax1.plot(vehicle['Vehicle_Acceleration'].iloc[40:250], '--k', label='$Unfiltered$')
+        ax1.plot(vehicle['deri_a_clipped'].iloc[40:250], '-k', label='$Filtered$')
+        ax1.set_ylabel('$Acceleration\ (m/s^2)$')
+        ax1.set_xticks([], [])
+        ax1.set_xlabel('$Time$')
+        ax1.set_xlim((6500, 6650))
+        ax1.legend(loc='lower right')
+
+        ax2.plot(vehicle['Vehicle_Velocity'].iloc[40:250], '--k', label='$Unfiltered$')
+        ax2.plot(vehicle['deri_v'].iloc[40:250], '-k', label='$Filtered$')
+        ax2.set_ylabel('$Velocity\ (m/s)$')
+        ax2.set_xlabel('$Time$')
+        ax2.set_xlim((6500, 6650))
+        ax2.set_xticks([], [])
+        ax2.legend(loc='lower right')
+    # plt.savefig('comparison_filtered_unfiltered.png', format='png', dpi=700,)
     plt.show()
 
 
@@ -315,8 +332,8 @@ if __name__ == '__main__':
 
     path = 'datasets/I80-0400-0415-filter_0.8_T.pickle'
     data = pd.read_pickle(path)
-    # plot_comparison(data, alpha=2, which='a')
-    differentiation(data,4)
+    plot_comparison(data, alpha=17, which='a and v')
+    # differentiation(data,4)
 
     # path = 'datasets/I80-0400-0415-filter_0.8_T.pickle'
     # extract_v_l_dx_dv_h(path, save=True)
