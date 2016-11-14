@@ -2,6 +2,7 @@ import tfnn
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
 
 
 ################################################
@@ -42,6 +43,55 @@ class Dataset(object):
                     raise ValueError('not support')
                 break
         return [features, targets]
+
+
+def cross_validation(train_config, predict, test_config):
+    # for calculating cost value and store it
+    all_data = pd.read_pickle(train_config.data_path)
+    X = all_data[list(range(20 - train_config.time_steps, 20))]
+    data = tfnn.Data(X, all_data.iloc[:, -1])
+    hidden_units = np.arange(30, 381, 50)
+    validation_costs = []
+    for hidden_unit in hidden_units:
+        print('hidden_unit: ', hidden_unit)
+        tfnn.reset_default_graph()
+        set_seed(11)
+        train_nn = tfnn.RegNetwork(data.xs.shape[1], data.ys.shape[1], do_dropout=False)
+        normal_data = train_nn.normalizer.minmax(data)
+        t_data, v_data = normal_data.train_test_split(0.95)
+        h1 = tfnn.HiddenLayer(hidden_unit, activator='relu')
+        out = tfnn.OutputLayer(activator='relu')
+        train_nn.build_layers([h1, out])
+        train_nn.set_optimizer('adam')
+        train_nn.set_learning_rate(train_config.learning_rate,
+                                   exp_decay=dict(decay_steps=train_config.decay_steps,
+                                                  decay_rate=train_config.decay_rate))
+        evaluator = tfnn.Evaluator(train_nn)
+
+        # training
+        for step in range(ITER_STEPS):
+            b_xs, b_ys = t_data.next_batch(train_config.batch_size)
+            train_nn.run_step(b_xs, b_ys)
+
+        # testing
+        cost = evaluator.compute_cost(v_data.xs, v_data.ys)
+        print('cost: ', cost)
+        validation_costs.append(cost)
+    # store values
+    with open('NNpg_cross_validation.pickle', 'wb') as f:
+        pickle.dump(validation_costs, f)
+
+    # load values
+    with open('NNpg_cross_validation.pickle', 'rb') as f:
+        validation_costs = pickle.load(f)
+    # hidden_units = np.arange(30, 331, 50)
+    plt.style.use('classic')
+    plt.title('$Cross-validation\ for\ selecting\ NNpg(1.0)\ hidden\ unit\ size$')
+    plt.plot(hidden_units, validation_costs, '-k')
+    plt.ylabel('$Cost$')
+    plt.xlabel('$Number\ of\ hidden\ units$')
+    plt.savefig('cross-validation_hidden_unit_size_NNpg(1.0).png', format='png', dpi=600)
+    # plt.show()
 
 
 def train_(train_config, predict, test_config):
@@ -219,7 +269,7 @@ if __name__ == '__main__':
     """
     # set_seed(1)
 
-    ITER_STEPS = 30001
+    ITER_STEPS = 10001
     PLOT_LOOP = 500
     TEST_LOOP = 5000
     PREDICT = 'gap'
@@ -232,5 +282,7 @@ if __name__ == '__main__':
     # all_data = np.hstack((v_xs, v_ys))
     # pd.DataFrame(all_data).to_pickle('datasets/I80-0500-0515-filter_0.8_T_F-displace_gap_T-displace_4NN_normalized300000.pickle')
 
-    train_nn = train_(train_config, PREDICT, test_config)
+    # train_nn = train_(train_config, PREDICT, test_config)
     # test_(test_config, 890, PREDICT, model=None)
+
+    cross_validation(train_config, PREDICT, test_config)

@@ -2,6 +2,7 @@ import tensorflow as tf
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
 
 
 class RNNDataSet(object):
@@ -173,7 +174,7 @@ class Plotter(object):
 
 class RNN(object):
 
-    def __init__(self, config):
+    def __init__(self, config, sess):
         self._batch_size = config.batch_size
         self._time_steps = config.time_steps
         self._input_size = config.input_size
@@ -190,12 +191,9 @@ class RNN(object):
             self._lr = config.learning_rate
             self._lr_decay_steps = config.decay_steps
             self._lr_decay_rate = config.decay_rate
-        if not self._is_training:
-            tf.reset_default_graph()
         self._built_RNN()
         self.saver = tf.train.Saver()
-        self.sess = tf.Session()
-        self.run(tf.initialize_all_variables())
+        self.sess = sess
 
     def _built_RNN(self):
         with tf.variable_scope('inputs'):
@@ -255,6 +253,7 @@ class RNN(object):
             mse_sum_across_time = tf.reduce_sum(mse_ave_across_batch, 0)
             # mse_sum_across_outputs = tf.reduce_sum(mse_sum_across_time, 0)
             self._cost = mse_sum_across_time
+            self._cost_ave_time = self._cost / self._time_steps
 
         if self._is_training:
             with tf.name_scope('trian'):
@@ -296,7 +295,7 @@ class RNN(object):
 
     @property
     def cost(self):
-        return self._cost
+        return self._cost_ave_time
 
     @staticmethod
     def ms_error(y_pre, y_target):
@@ -328,10 +327,10 @@ class RNN(object):
         pred, self.state_ = self.run([self._pred, self._cell_final_state], feed_dict=feed_dict)
         return pred[0, 0]
 
+
 def test_on_frame_id(model, test_config):
-    plt.ion()
-    model.restore(test_config.restore_path + '_' + test_config.predict)
-    ps, vs, pps = test_config.data
+    model.restore(test_config.restore_path)
+    ps, vs, pps, position_range = test_config.data
 
     test_ps = ps.copy()
     test_vs = vs.copy()
@@ -374,12 +373,26 @@ def test_on_frame_id(model, test_config):
                     test_ps.loc[:t, i] = None
                     test_vs.loc[:t, i] = None
                 is_initial_state = False
-    plt.figure(0, figsize=(10, 10))
-    plt.title('Position')
-    plt.cla()
-    plt.plot(ps, 'k-')
-    plt.plot(test_ps.iloc[:, 1:], 'r--')
-    # plt.ylim((0, 400))
+
+    plt.style.use('classic')
+    predict = 'pg'
+    model_name = 'RNN{0}({1:.1f})'.format(predict, train_config.time_steps / 10)
+    base_dir = 'RNN%s(%s)/' % (predict, train_config.time_steps / 10)
+
+    fig = plt.figure()
+    # fig.suptitle('$Predicted\ trajectory$')
+
+    ax = fig.add_subplot(1, 1, 1)
+    ps.index /= 10
+    test_ps.index /= 10
+    ax.plot(ps, 'k-', label='$I-80$')
+    ax.plot(test_ps.iloc[:, 1:], 'r--', label='${}$'.format(model_name))
+    ax.set_xlabel('$Time\ (s)$')
+    ax.set_ylabel('$Position\ (m)$')
+    handles, labels = ax.get_legend_handles_labels()
+    plt.legend([handles[0], handles[-1]], [labels[0], labels[-1]], loc='upper right')
+    plt.ylim(position_range)
+    plt.savefig(base_dir + 'RNN%s_SA4.png' % (predict), format='png', dpi=1000)
 
     # test.f, test.ax = plt.subplots(test_config.sim_car_num-1, 1)
     # test.f.suptitle('Velocity')
@@ -387,7 +400,7 @@ def test_on_frame_id(model, test_config):
     #     test.ax[i].plot(vs.iloc[:, i + 1], 'k-')
     #     test.ax[i].plot(test_vs.iloc[:, i + 1], 'r--')
 
-    plt.show()
+    # plt.show()
 
 
 def test_on_car_id(model, test_config):
@@ -398,7 +411,7 @@ def test_on_car_id(model, test_config):
     using last real gap - this gap without movement of proceeding car.
     """
     plt.ion()
-    model.restore(test_config.restore_path)
+    # model.restore(test_config.restore_path)
     ps, vs = test_config.data
 
     test_ps = ps.copy()
@@ -440,22 +453,23 @@ def test_on_car_id(model, test_config):
 
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
-    ps.index /= 10
+    ps_copy = ps.copy()
+    ps_copy.index /= 10
     test_ps.index /= 10
-    ax.plot(ps, 'k-', label='$I-80$')
+    ax.plot(ps_copy, 'k-', label='$I-80$')
     ax.plot(test_ps.iloc[:, 1:], 'r--', label='${}$'.format(model_name))
     fig.suptitle('$Predicted\ trajectory$')
     ax.set_xlabel('$Time\ (s)$')
     ax.set_ylabel('$Position\ (m)$')
     for i in range(1, test_config.sim_car_num):
-        traj = ps.iloc[:, i].dropna()
+        traj = ps_copy.iloc[:, i].dropna()
         x = traj.index[0]
         y = traj.iloc[0]
         ax.text(x - 1, y - 13, '$f{}$'.format(i))
     handles, labels = ax.get_legend_handles_labels()
     plt.legend([handles[0], handles[-1]], [labels[0], labels[-1]], loc='best')
     plt.ylim((0, 400))
-    plt.savefig(base_dir + 'RNN%s_traj.png' % (predict), format='png', dpi=1000)
+    # plt.savefig(base_dir + 'RNN%s_traj.png' % (predict), format='png', dpi=1000)
 
     # test.f, test.ax = plt.subplots(test_config.sim_car_num-1, 1)
     # test.f.suptitle('Velocity')
@@ -477,11 +491,57 @@ def test_on_car_id(model, test_config):
     plt.show()
 
 
+def cross_validation(train_config, test_config):
+    hidden_units = np.arange(1, 82, 20)
+
+    # # run validation codes
+    # validation_costs = []
+    # for hidden_unit in hidden_units:
+    #     data = RNNDataSet(train_config.basket_len)
+    #     train_config.cell_size = hidden_unit
+    #     tf.reset_default_graph()
+    #     set_seed(11)
+    #     sess = tf.Session()
+    #     train_rnn = RNN(train_config, sess)
+    #     sess.run(tf.initialize_all_variables())
+    #     state_ = train_rnn.run(train_rnn.cell_initial_state)
+    #     for i in range(train_config.iter_steps):
+    #         b_xs, b_ys, zero_initial_state = data.next(train_config.batch_size, train_config.time_steps)  # this for a batch
+    #         b_xs = b_xs * train_config.displacement_scale + train_config.displacement_bias
+    #         if zero_initial_state:
+    #             state_ = train_rnn.run(train_rnn.cell_initial_state)
+    #         feed_dict = {train_rnn.xs: b_xs, train_rnn.ys: b_ys, train_rnn._cell_initial_state: state_,
+    #                      train_rnn.global_step: i}
+    #         _, state_, cost, lr_, pred_ = train_rnn.run(
+    #             [train_rnn.train_op, train_rnn.cell_final_state, train_rnn.cost, train_rnn.lr, train_rnn.pred],
+    #             feed_dict=feed_dict)
+    #
+    #     print('hidden_units:', hidden_unit, 'cost: ', cost)
+    #     validation_costs.append(cost)
+    # # store values
+    # with open('RNNpg_cross_validation.pickle', 'wb') as f:
+    #     pickle.dump(validation_costs, f)
+
+    with open('RNNpg_cross_validation.pickle', 'rb') as f:
+        validation_costs = pickle.load(f)
+    plt.style.use('classic')
+    plt.title('$Cross-validation\ for\ selecting\ RNNpg(1.0)\ hidden\ unit\ size$')
+    plt.plot(hidden_units, validation_costs, '-k')
+    plt.ylabel('$Cost$')
+    plt.xlabel('$Number\ of\ hidden\ units$')
+    plt.savefig('cross-validation_hidden_unit_size_RNNpg(1.0).png', format='png', dpi=600)
+    # plt.show()
+
+
 def train(train_config, test_config):
     # plotter = Plotter(train_config.time_steps, train_config.predict)
     data = RNNDataSet(train_config.basket_len)
-    train_rnn = RNN(train_config)
-    test_rnn = RNN(test_config)
+    with tf.variable_scope('rnn') as scope:
+        sess = tf.Session()
+        train_rnn = RNN(train_config, sess)
+        scope.reuse_variables()
+        test_rnn = RNN(test_config, sess)
+        sess.run(tf.initialize_all_variables())
     state_ = train_rnn.run(train_rnn.cell_initial_state)
     for i in range(train_config.iter_steps):
         b_xs, b_ys, zero_initial_state = data.next(train_config.batch_size, train_config.time_steps)  # this for a batch
@@ -497,11 +557,11 @@ def train(train_config, test_config):
         if i % train_config.plot_loop == 0:
             # plotter.update()
             print('step:', i, 'cost: ', cost_, 'lr: ', lr_)
-    print("Save to path: ", train_rnn.save('tmp/RNNpg(1.0)'))
-            # test_on_frame_id(test_rnn, test_config)
+            # test_on_car_id(test_rnn, test_config)
             # plt.pause(0.001)
             # print('done plot')
         # plotter.plt_time += train_config.time_steps
+    print("Save to path: ", train_rnn.save('tmp/RNNpg(1.0)'))
 
 
 class TrainConfig(object):
@@ -513,7 +573,7 @@ class TrainConfig(object):
 
     # data_path = 'datasets/I80-0500-0515-filter_0.8_T_v_ldxdvhdisplace_proposition&displacement.pickle'
     # data_path = 'datasets/I80-0400_lane2.pickle'
-    iter_steps = 100001
+    iter_steps = 10001
     plot_loop = 2000
     basket_len = [20, 100, 300, 1000]
     predict = 'partial_gap'
@@ -529,6 +589,8 @@ class TrainConfig(object):
     learning_rate = 5e-4
     decay_steps = 5000          # lr * decay_rate ^ (1/decay_steps)
     decay_rate = 0.9
+    displacement_scale = 1 / 3.5
+    displacement_bias = - 0.5
 
 
 class TestConfig(object):
@@ -544,9 +606,12 @@ class TestConfig(object):
     weighted_cost = True
     on_test = True
     restore_path = 'tmp/RNNpg(1.0)'
-    sim_car_num = 9
-    start_car_id = 890          # 890 has good result
+    sim_car_num = 8
+    displacement_scale = 1 / 3.5
+    displacement_bias = - 0.5
 
+    on_frame_car_id = 'car_id'
+    start_car_id = 890          # 890 has good result
 
     # available [2700, 3000] position [90, 350]    with oscillation
     # available [6000, 6500] position [0, 400]    with oscillation, no lane changing
@@ -554,13 +619,13 @@ class TestConfig(object):
     # available [2200, 2400] position [150, 320]   without oscillation
     # available [3200, 3500] position [80, 400]    without oscillation, with lane changing
 
-    # frame_id_range = [6500, 7000]           # the minimum is 12, the maximum is 9974
-    # position_range = [0, 700]
+    frame_id_range = [3200, 3500]           # the minimum is 12, the maximum is 9974
+    position_range = [80, 400]
 
     def __init__(self):
-        if hasattr(self, 'start_car_id'):
+        if self.on_frame_car_id == 'car_id':
             self.data = self.get_test_date_by_id()
-        if hasattr(self, 'frame_id_range'):
+        if self.on_frame_car_id == 'frame_id':
             self.data = self.get_test_data_by_time()
 
     def get_test_data_by_time(self):
@@ -591,7 +656,7 @@ class TestConfig(object):
         # plt.show()
         # exit()
 
-        return [ps, vs, pps]
+        return [ps, vs, pps, self.position_range]
 
     def get_test_date_by_id(self):
         df = pd.read_pickle(self.data_path)[['filter_position', 'Vehicle_ID', 'Frame_ID', 'displacement',
@@ -640,6 +705,8 @@ if __name__ == '__main__':
 
     # train(train_config, test_config)
 
-    test_rnn = RNN(test_config)
+    # test_rnn = RNN(test_config)
+    # test_on_frame_id(test_rnn, test_config)
+    # test_on_car_id(test_rnn, test_config)
 
-    test_on_car_id(test_rnn, test_config)
+    cross_validation(train_config, test_config)
